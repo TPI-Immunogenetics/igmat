@@ -9,6 +9,7 @@ from subprocess import Popen, PIPE
 # from src import fasta
 from . import imgt
 from . import fasta
+from .alphabet import Alphabet
 # from src import model
 # from src import alphabet
 # from .fasta import 
@@ -371,7 +372,7 @@ def generateAlignment(sequences, path, isIMGT=False, alph='full'):
         combined = sequences['V'][ (species, chain_type) ][v] + sequences['J'][ (species, chain_type) ][j]
 
         # Translate to alphabet
-        combined = alphabet.reduce(combined, alph)
+        combined = Alphabet.reduce(combined, alph)
 
         # Store it
         name = ("%s|%s|%s"%(vspecies, vallele,jallele)).replace(" ", "_")
@@ -551,7 +552,7 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   #   sys.exit(1)
 
   # # Generate the output path
-  # output = os.path.join(file_path, 'data')
+  output = os.path.join(file_path, 'data')
   # os.makedirs(output, exist_ok=True)
 
   # Generate the model folder

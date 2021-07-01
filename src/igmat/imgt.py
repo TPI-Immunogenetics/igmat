@@ -117,7 +117,7 @@ def _format_j_genes(jalignments):
   }
 
   # Get alignment executable
-  musclePath = helpers.get_binary('muscle')
+  musclePath = helpers.get_dir_binary('muscle')
   # musclePath = os.path.join(bin_path, 'win32', 'muscle')
   # if sys.platform == 'linux' or sys.platform == 'linux2':
   #   musclePath = os.path.join(bin_path, 'linux', 'muscle')
