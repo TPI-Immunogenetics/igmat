@@ -8,6 +8,7 @@ from subprocess import Popen, PIPE
 
 # from src import fasta
 from . import imgt
+from . import igmat
 from . import fasta
 from .alphabet import Alphabet
 # from src import model
@@ -248,7 +249,7 @@ def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
       # In order to get a nice result, we need to add a J-Region to the V-Region.
       # We are using a reference J-Region
       testSequence = sequenceData['V'][chain][sequence] + reference['sequence']
-      result = model.annotate(fasta.sequence('Test', testSequence), imgtModel)
+      result = igmat.annotate(fasta.sequence('Test', testSequence), imgtModel)
       # result = anarci.anarci_thread(fasta.sequence('Test', testSequence), imgtModel)
       if not result:
         continue
@@ -480,10 +481,12 @@ def generateModel(alignment, name, path, hmmerpath=""):
 
   return True
 
-def generateDatafile(sequences, filename, alph):
+def generateDatafile(name, sequences, filename, alph):
 
   data = {
+    'name': name,
     'alphabet': alph,
+    'chain': [],
     'J': {},
     'V': {}
   }
@@ -492,6 +495,10 @@ def generateDatafile(sequences, filename, alph):
   for chain in ['V', 'J']:
     for species, chain_type in sequences[chain]:
       for ((_,gene), seq) in sequences[chain][ (species, chain_type) ].items():
+
+        # Add chain to output
+        if chain_type not in data['chain']:
+          data['chain'].append(chain_type)
 
         # Add chain key
         if chain_type not in data[chain]:
@@ -572,7 +579,7 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
 
       # Load the IMGT HMMER model
       # try:
-      dataset = model.HMMmodel(output, 'IMGT', hmmerpath)
+      dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
       # except Exception:
         # print('Unable to find IMGT HMM model. Please run the build script without arguments first.')
         # sys.exit()
@@ -604,7 +611,7 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   # germlinePath =  os.path.join(output, args.name + '.json')
   germlinePath = os.path.join(output, modelName + '.json')
   print('Generating data file \'%s\'' % modelName)
-  generateDatafile(sequenceData, germlinePath, alph=alphabet)
+  generateDatafile(modelName, sequenceData, germlinePath, alph=alphabet)
 
   # except Exception as e:
   #   print('Error - %s' % e)

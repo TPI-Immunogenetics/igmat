@@ -6,6 +6,7 @@ import argparse
 from .alphabet import Alphabet
 from .build import build
 from .run import run
+from . import igmat
 from . import helpers
 
 
@@ -39,7 +40,29 @@ def __build(args):
 
 def __list(args):
 
-  print('Showing the list of parameters')
+  if args.clear and args.details:
+    raise Exception('Please specify one single flag')
+
+  # Remove data
+  if args.clear:
+    print('Clearing data')
+    igmat.libraryClear(args.name)
+    return
+
+  # Show details
+  if args.details:
+    print('Showing details for model {name}'.format(name=args.name))
+    igmat.libraryDetails(args.name)
+    return
+
+  # No flags defined. show a list of libraries
+  for library in igmat.libraryList():
+    print('{name}\t{alphabet}\t{chain}\n'.format(
+      name=library['name'],
+      alphabet=library['alphabet'],
+      chain=','.join(library['chain']))
+    )
+
 
 def main(*args, **kwargs):
 
@@ -73,6 +96,9 @@ def main(*args, **kwargs):
 
   # List command
   parser_list = subparsers.add_parser('list', help='List IgMAT libraries')
+  parser_list.add_argument('-n','--name', type=str, help="HMM model name", dest="name", required=False, default=None)
+  parser_list.add_argument("-c", "--clear", action="store_true", dest="clear", help="Remove all libraries")
+  parser_list.add_argument('-d', '--details', action="store_true", help='Show HMM model details', dest='details')
   parser_list.set_defaults(cmd=__list)
 
   # Check input arguments

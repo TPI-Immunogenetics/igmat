@@ -2,12 +2,15 @@
 import os
 import sys
 import json
+import shutil
 import tempfile
 import traceback
 import logging
+from pathlib import Path
 from subprocess import Popen, PIPE
 
 from . import fasta
+from . import helpers
 from .alphabet import Alphabet
 # from src.hmm.parser import Parser as hmmParser
 
@@ -170,74 +173,6 @@ class HMMmodel():
         
     # This shouldn't happen
     return None
-
-  def germline(self, state_vector, sequence, chain_type, allowed_species=None):
-
-    """
-    Find the closest sequence identity match.
-    """
-
-    # Open the model germline file
-    germlinePath = self.modelpath + '.json'
-    if not os.path.exists(germlinePath):
-      raise Exception('Unable to find germline file for model \'{model}\''.format(model=self.modelname))
-
-    germline = {}
-    with open(germlinePath, 'r') as handle:
-      germline = json.load(handle)
-    
-    genes = {
-      'v_gene': None,
-      'j_gene': None
-    }
-
-    # Extract the positions that correspond to match (germline) states. 
-    state_dict = dict( ((i, 'm'),None) for i in range(1,129))
-    state_dict.update(dict(state_vector))
-    state_sequence = ''.join([ sequence[state_dict[(i, 'm')]] if state_dict[(i,'m')] is not None else "-" for i in range(1,129) ])
-
-    # Iterate over the v-germline sequences of the chain type of interest.
-    # The maximum sequence identity is used to assign the germline 
-    if chain_type in germline["V"]:
-      if allowed_species is not None:
-        if not all( [ sp in germline['V'][chain_type] for sp in allowed_species ] ): # Made non-fatal
-          return None
-      else:
-        allowed_species = all_species
-
-      resultList = []
-      for species in allowed_species:
-
-        if species not in germline["V"][ chain_type ]: 
-          continue # Previously bug.
-
-        for gene, germline_sequence in germline["V"][ chain_type ][ species ].items():
-          resultList.append({
-            'species': species,
-            'gene': gene,
-            'identity': get_identity(state_sequence, germline_sequence)
-          })
-
-      genes['v_gene'] = max(resultList, key=lambda x: x['identity'])
-      
-      # Use the assigned species for the v-gene for the j-gene. 
-      # This assumption may affect exotically engineered abs but in general is fair.    
-      species = genes['v_gene']['species']
-
-      # TODO: cleanup
-      if chain_type not in germline['J'] or species not in germline['J'][chain_type]:
-        return genes
-
-      resultList = []
-      for gene, germline_sequence in germline["J"][ chain_type ][ species ].items():
-        resultList.append({
-          'species': species,
-          'gene': gene,
-          'identity': get_identity(state_sequence, germline_sequence)
-          })
-      genes['j_gene'] = max(resultList, key=lambda x: x['identity'])
-
-    return genes
 
   def __hmm_align__(self, hspList, seq_length):
 
@@ -403,120 +338,10 @@ class HMMmodel():
             # print('Non contiguous region with {region_next}'.format(region_next=region_next))
             continue
 
-
         # This is the best region so far
         if region_name not in state_vector or state_vector[region_name]['score'] < stateRegion['score']:
           prev_score = 0 if (region_name not in state_vector) else state_vector[region_name]['score']
-          # print('Region: {region}; Previous score: {prev_score}; New score: {new_score}; start: {start}; stop: {stop}'.format(
-          #   region=region_name, 
-          #   prev_score=prev_score, 
-          #   new_score=stateRegion['score'],
-          #   start=stateRegion['start'],
-          #   stop=stateRegion['stop'])
-          # )
-
           state_vector[region_name] = stateRegion
-
-
-    # state_vector = {}
-    # regionList = list(regionMap.keys())
-    # print(regionList)
-    # # for region_name in regionMap:
-    # for k in range(len(regionList)):
-
-    #   region_name = regionList[k]
-    #   region_prev = None if k == 0 else regionList[(k-1)]
-    #   region_next = None if k == len(regionList)-1 else regionList[(k+1)]
-    #   print(region_prev, region_name, region_next)
-
-    #   # Align states to get the best regions
-    #   region = regionMap[region_name]
-    #   for state in stateList:
-
-    #     stateRegion = {
-    #       'score': 0,
-    #       'start': -1,
-    #       'stop': -1,
-    #       'size': 0,
-    #       'vector': []
-    #     }
-
-    #     # Add any eventual missing start position
-    #     state_start = state[0] if len(state) > 0 else None
-    #     if state_start and state_start['hmm'] > region['start']+1:
-    #       for i in range(region['start']+1, min(region['stop']+1, state_start['hmm'])):
-    #         stateRegion['vector'].append({'hmm': i, 'type': '-', 'idx': None, 'score': 0})
-
-    #     # Assemble region and calculate score
-    #     stateSize = 0
-    #     for i in range(len(state)):
-    #       hmm_pos = state[i]['hmm']
-    #       if hmm_pos <= region['start']:
-    #         continue
-
-    #       if hmm_pos > region['stop']:
-    #         break
-
-    #       stateRegion['size'] += 1 if state[i]['type'] == 'm' else 0
-    #       stateRegion['score'] += state[i]['score']
-    #       stateRegion['start'] = stateRegion['start'] if stateRegion['start'] and stateRegion['start'] >= 0 else state[i]['idx']
-    #       stateRegion['stop'] = state[i]['idx'] if state[i]['idx'] else stateRegion['stop']
-    #       stateRegion['vector'].append(state[i])
-
-    #     # Average the score by size
-    #     # stateRegion['score'] = stateRegion['score']/max(1, stateRegion['size'])
-
-    #     # Add any eventual missing end position
-    #     state_stop = state[-1] if len(state) > 0 else None
-    #     if state_stop and state_stop['hmm'] < region['stop']+1:
-    #       for i in range(state_stop['hmm'], region['stop']+1):
-    #         stateRegion['vector'].append({'hmm': i, 'type': '-', 'idx': None, 'score': 0})
-
-    #     # Check if the region is complete
-    #     if len(stateRegion['vector']) == 0 or stateRegion['vector'][0]['hmm']-1 > region['start'] or stateRegion['vector'][-1]['hmm'] < region['stop']:
-    #       print('Incomplete region: {name}'.format(name=region_name))
-    #       continue
-
-    #     # Check if the region is continuous
-    #     # if region_name in state_vector:
-
-    #     #   # Check if contiguous with prev region
-
-    #     #   if (region_prev and region_prev in state_vector):
-    #     #     print('Previous region')
-    #     #     print(state_vector[region_prev])
-
-    #     #   if (region_next and region_next in state_vector):
-    #     #     print('Next region')
-    #     #     print(state_vector[region_next])
-
-    #     #   if (region_prev and region_prev in state_vector) and state_vector[region_prev]['stop'] > stateRegion['start']:
-    #     #     print('Non contiguous region with {region_prev}'.format(region_prev=region_prev))
-    #     #     continue
-
-    #     #   # Check if contiguous with next region
-    #     #   if (region_next and region_next in state_vector) and stateRegion['stop'] > state_vector[region_next]['start']:
-    #     #     print('Non contiguous region with {region_next}'.format(region_next=region_next))
-    #     #     continue
-
-
-    #     # This is the best region so far
-    #     if region_name not in state_vector or state_vector[region_name]['score'] < stateRegion['score']:
-    #       prev_score = 0 if (region_name not in state_vector) else state_vector[region_name]['score']
-    #       print('Region: {region}; Previous score: {prev_score}; New score: {new_score}; start: {start}; stop: {stop}'.format(
-    #         region=region_name, 
-    #         prev_score=prev_score, 
-    #         new_score=stateRegion['score'],
-    #         start=stateRegion['start'],
-    #         stop=stateRegion['stop'])
-    #       )
-
-    #       state_vector[region_name] = stateRegion
-
-    # for i in state_vector:
-    #   print(i, state_vector[i]['score'])
-    #   for j in range(len(state_vector[i]['vector'])):
-    #     print(state_vector[i]['vector'][j])
 
     # Check for non contiguous regions
     # This fixes problems when aligning two or more hmms and something is overlapping
@@ -648,28 +473,6 @@ class HMMmodel():
       raise Exception('Unable to find %s %s in HMMR model' % (species, chain))
 
     return self.dataset[name]['size']
-
-# def get_identity(state_sequence, germline_sequence):
-#   """
-#   Get the partially matched sequence identity between two aligned sequences. 
-#   Partial in the sense that gaps can be in the state_sequence.
-#   """
-#   # Ensure that the sequences are the expected length
-#   assert len( state_sequence) == len(germline_sequence ) == 128
-#   n, m = 0, 0
-#   for i in range( 128 ):
-#     if germline_sequence[i] == "-":
-#       continue
-
-#     if state_sequence[i].upper() == germline_sequence[i]: 
-#       m+=1
-
-#     n+=1
-
-#   if not n:
-#     return 0    
-
-#   return float(m)/n
     
 def annotate(
   sequence,
@@ -729,3 +532,69 @@ def annotate(
   })
 
   return result
+
+def libraryList():
+
+  '''
+  Get a list of available models
+  '''
+  result = []
+  path = helpers.get_dir_data()
+  if not os.path.exists(path):
+    return result
+
+  # Get the data directory
+  for file in os.listdir(path):
+    if not file.endswith('.json'):
+      continue
+
+    # Read the file
+    with open(os.path.join(path, file)) as handle:
+      data = json.load(handle)
+
+    result.append({
+      'name': data['name'],
+      'alphabet': data['alphabet'],
+      'chain': data['chain']
+    })
+
+  return result
+
+def libraryClear(name):
+  '''
+  Remove all - or a specific - library
+  '''
+
+
+  def removeLibrary(path, name):
+
+    # Removing library files
+    shutil.rmtree(os.path.join(path, name), ignore_errors=True)
+    for file in Path(path).glob("{name}.*".format(name=name)):
+      file.unlink()
+
+  # Name defined - remove a specific library
+  path = helpers.get_dir_data()
+  if not os.path.exists(path):
+    return
+
+  if name:
+    removeLibrary(path, name)
+    return
+
+  # Iterate the data directory
+  for file in os.listdir(path):
+    if not file.endswith('.json'):
+      continue
+
+    # Remove single library
+    removeLibrary(path, file.replace('.json', ''))
+
+
+def libraryDetails(name):
+
+  '''
+  Get details for a model
+  '''
+
+  return None
