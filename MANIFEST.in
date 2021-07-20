@@ -1,2 +1,0 @@
-recursive-include bin/darwin *
-recursive-include bin/linux *

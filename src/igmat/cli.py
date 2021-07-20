@@ -12,6 +12,8 @@ from . import helpers
 # Pretty table
 from prettytable import PrettyTable
 
+from igmat.hmm.manager import Manager
+
 def __run(args):
 
   run(
@@ -45,10 +47,12 @@ def __list(args):
   if args.clear and args.details:
     raise Exception('Please specify one single flag')
 
+  manager = Manager(args.hmmerpath)
+
   # Remove data
   if args.clear:
     print('Clearing data')
-    igmat.libraryClear(args.name)
+    manager.clear(args.name)
     return
 
   # Show details
@@ -59,7 +63,7 @@ def __list(args):
 
     print('Showing details for model {name}'.format(name=args.name))
     table = PrettyTable(['Species', 'chain', 'size', 'entropy'])
-    details = igmat.libraryDetails(args.name)
+    details = manager.details(args.name)
     for key in details:
       table.add_row([
         details[key]['species'],
@@ -74,7 +78,7 @@ def __list(args):
 
   # No flags defined. show a list of libraries
   table = PrettyTable(['name', 'alphabet', 'chains'])
-  for library in igmat.libraryList():
+  for library in manager.list():
 
     table.add_row([
       library['name'],

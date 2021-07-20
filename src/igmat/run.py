@@ -14,6 +14,8 @@ from . import helpers
 from . import counter
 from . import igmat
 
+from igmat.hmm.manager import Manager
+
 # Install custom logger
 logger.install()
 
@@ -247,9 +249,13 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
   # # Get process start time
   # start = time.time()
 
+  # Create the manager object
+  manager = Manager(hmmerpath)
+
   # Load the HMMR model
   # try:
-  dataset = igmat.HMMmodel(helpers.get_dir_data(), model, hmmerpath)
+  # dataset = igmat.HMMmodel(helpers.get_dir_data(), model, hmmerpath)
+  dataset = manager.load(model)
   # except Exception as e:
     # logging.error('Unable to load \'%s\' HMM dataset' % args.model)
     # sys.exit(1)

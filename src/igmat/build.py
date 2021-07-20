@@ -11,6 +11,8 @@ from . import imgt
 from . import igmat
 from . import fasta
 from .alphabet import Alphabet
+
+from igmat.hmm.manager import Manager
 # from src import model
 # from src import alphabet
 # from .fasta import 
@@ -567,6 +569,9 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   modelPath = os.path.join(output, modelName)
   os.makedirs(modelPath, exist_ok=True)
 
+  # Create the manager object
+  manager = Manager(hmmerpath)
+
   # Extract data from the provided input
   sequenceData = None
   isIMGT = True if name == 'IMGT' else False
@@ -579,7 +584,8 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
 
       # Load the IMGT HMMER model
       # try:
-      dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
+      # dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
+      dataset = manager.load('IMGT')
       # except Exception:
         # print('Unable to find IMGT HMM model. Please run the build script without arguments first.')
         # sys.exit()
