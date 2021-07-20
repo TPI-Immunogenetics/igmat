@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import traceback
 import logging
+from typing import Union
 from pathlib import Path
 from subprocess import Popen, PIPE
 
@@ -30,7 +31,7 @@ class HMMmodel():
     self.modelname = model
     self.modelpath = os.path.join(path, model)
     self.hmmerpath = hmmerpath
-    self.dataset = {}
+    self._dataset = {}
 
     if not self.__load__(path, model):
       raise Exception('Unable to correctly load HMMR model')
@@ -62,14 +63,19 @@ class HMMmodel():
         if line[0] == '#':
           continue
 
-        line = line.split()
+        line = line.strip().split()
         if len(line) < 5:
           continue
 
         name = line[1]
-        size = int(line[5])
-        self.dataset[name] = {
-          'size': size
+        species, chain = name.split('_')
+        # size = int(line[5])
+        self._dataset[name] = {
+          'nseq': int(line[3]),
+          'species': species,
+          'chain': chain,
+          'relent': float(line[6]), # Relative entropy
+          'size': int(line[5])
         }
 
       # Load dataset info from the json file
@@ -90,13 +96,16 @@ class HMMmodel():
 
   def run(self, sequence, threshold=0, restrict=[]):
 
-    # Create a fasta file for all the sequences. Label them with their sequence index
-    # Todo: use tempfile.TemporaryDirectory
-    fasta_filehandle, fasta_filename =  tempfile.mkstemp( ".fasta", text=True)
-    with os.fdopen(fasta_filehandle,'w') as outfile:
-      outfile.write(">%s\n%s\n" % (sequence.getName(), Alphabet.reduce(sequence.getSequence(), self.alpha) ))
+    # # Create a fasta file for all the sequences. Label them with their sequence index
+    # # Todo: use tempfile.TemporaryDirectory
+    # fasta_filehandle, fasta_filename =  tempfile.mkstemp( ".fasta", text=True)
+    # with os.fdopen(fasta_filehandle,'w') as outfile:
+    #   outfile.write(">{name}\n{sequence}\n".format(
+    #     name=sequence.getName(),
+    #     sequence=Alphabet.reduce(sequence.getSequence(), self.alpha)
+    #   ))
 
-    output_filehandle, output_filename = tempfile.mkstemp(".txt", text=True)
+    # output_filehandle, output_filename = tempfile.mkstemp(".txt", text=True)
 
     # Run hmmer as a subprocess
     hmmscan = "hmmscan"
@@ -104,6 +113,21 @@ class HMMmodel():
       hmmscan = os.path.join(self.hmmerpath, hmmscan)
 
     try:
+
+      # Create a temporary directory
+      dirpath = tempfile.mkdtemp()
+
+      # Create a fasta file for all the sequences. Label them with their sequence index
+      # fasta_filehandle, fasta_filename =  tempfile.mkstemp( ".fasta", text=True)
+      fasta_filename = os.path.join(dirpath, 'input.fasta')
+      output_filename = os.path.join(dirpath, 'output.txt')
+      with open(fasta_filename,'w') as handle:
+        handle.write(">{name}\n{sequence}\n".format(
+          name=sequence.getName(),
+          sequence=Alphabet.reduce(sequence.getSequence(), self.alpha)
+        ))
+
+      # output_filehandle, output_filename = tempfile.mkstemp(".txt", text=True)
 
       command = [ hmmscan, "--domT", "0", "-o", output_filename, self.modelpath + '.hmm', fasta_filename]
       process = Popen(command, stdout=PIPE, stderr=PIPE  )
@@ -161,15 +185,16 @@ class HMMmodel():
 
       consensus.update({
         'hits': hitList
-        })
+      })
 
       return consensus
     finally:
-      os.close(output_filehandle)
+      shutil.rmtree(dirpath)
+      # os.close(output_filehandle)
 
-      # clean up
-      os.remove(fasta_filename)
-      os.remove(output_filename)
+      # # clean up
+      # os.remove(fasta_filename)
+      # os.remove(output_filename)
         
     # This shouldn't happen
     return None
@@ -203,7 +228,7 @@ class HMMmodel():
 
       # Extact the full length of the HMM hit
       species, ctype = hsp.hit_id.split('_')
-      _hmm_length = self.getModelSize(species, ctype)
+      _hmm_length = self.size(species, ctype)
 
       # Handle cases where there are n terminal modifications.
       # In most cases the user is going to want these included in the numbered domain even though they are not 'antibody like' and 
@@ -330,12 +355,10 @@ class HMMmodel():
 
           # Check if contiguous with prev region
           if (region_prev and region_prev in state_vector) and state_vector[region_prev]['stop'] > stateRegion['start']:
-            # print('Non contiguous region with {region_prev}'.format(region_prev=region_prev))
             continue
 
           # Check if contiguous with next region
           if (region_next and region_next in state_vector) and stateRegion['stop'] > state_vector[region_next]['start']:
-            # print('Non contiguous region with {region_next}'.format(region_next=region_next))
             continue
 
         # This is the best region so far
@@ -419,8 +442,6 @@ class HMMmodel():
         position += 1
         continue
 
-      # print(last)
-      # print(prev['idx']+1)
       if not last['idx']:
         continue
 
@@ -466,19 +487,32 @@ class HMMmodel():
 
     return True
 
-  def getModelSize(self, species, chain):
+  @property
+  def details(self):
+    return self._dataset
+
+  def size(self, species, chain):
 
     name = '{species}_{chain}'.format(species=species, chain=chain)
-    if name not in self.dataset:
+    if name not in self._dataset:
       raise Exception('Unable to find %s %s in HMMR model' % (species, chain))
 
-    return self.dataset[name]['size']
+    return self._dataset[name]['size']
     
 def annotate(
-  sequence,
-  model,
+  sequence: Union[str, fasta.sequence],
+  model: Union[str, HMMmodel] = 'IMGT',
   threshold=0,
-  restrict=[]):
+  restrict=[],
+  hmmerpath=None):
+
+  # Generate a sequence object
+  if isinstance(sequence, str):
+    sequence = fasta.sequence('input', sequence)
+
+  # Load the model object
+  if isinstance(model, str):
+    model = HMMmodel(helpers.get_dir_data(), model, hmmerpath)
 
   # Check if the sequence if valid
   if not sequence.isValid():
@@ -565,7 +599,6 @@ def libraryClear(name):
   Remove all - or a specific - library
   '''
 
-
   def removeLibrary(path, name):
 
     # Removing library files
@@ -590,11 +623,12 @@ def libraryClear(name):
     # Remove single library
     removeLibrary(path, file.replace('.json', ''))
 
-
 def libraryDetails(name):
 
   '''
   Get details for a model
   '''
 
-  return None
+  model = HMMmodel(helpers.get_dir_data(), name)
+
+  return model.details

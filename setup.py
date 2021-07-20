@@ -4,6 +4,8 @@ from setuptools import setup
 setup(
     name="IgMAT",
     install_requires=[
+        'prettytable',
+        'biopython'
     ],
     extras_require={
     },

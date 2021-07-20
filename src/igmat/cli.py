@@ -9,6 +9,8 @@ from .run import run
 from . import igmat
 from . import helpers
 
+# Pretty table
+from prettytable import PrettyTable
 
 def __run(args):
 
@@ -51,17 +53,36 @@ def __list(args):
 
   # Show details
   if args.details:
+
+    if not args.name:
+      raise Exception('No model name is provided')
+
     print('Showing details for model {name}'.format(name=args.name))
-    igmat.libraryDetails(args.name)
+    table = PrettyTable(['Species', 'chain', 'size', 'entropy'])
+    details = igmat.libraryDetails(args.name)
+    for key in details:
+      table.add_row([
+        details[key]['species'],
+        details[key]['chain'],
+        details[key]['size'],
+        details[key]['relent']
+      ])
+
+    # Print the table
+    print(table)
     return
 
   # No flags defined. show a list of libraries
+  table = PrettyTable(['name', 'alphabet', 'chains'])
   for library in igmat.libraryList():
-    print('{name}\t{alphabet}\t{chain}\n'.format(
-      name=library['name'],
-      alphabet=library['alphabet'],
-      chain=','.join(library['chain']))
-    )
+
+    table.add_row([
+      library['name'],
+      library['alphabet'],
+      ','.join(library['chain'])
+    ])
+
+  print(table)
 
 
 def main(*args, **kwargs):
