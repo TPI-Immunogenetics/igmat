@@ -23,7 +23,8 @@ Once done, to exit the environment, type:
 ## CLI tools ##
 IgMAT comes with a set of cli tools for handling custom HMM models and processing data:
 
-  igmat <tool> --help
+    igmat <tool> --help
+
 Where `tool` is one of the following:
  
  - **run**: process the input sequence/file and run the annotation script.
