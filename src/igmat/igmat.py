@@ -1,30 +1,12 @@
 
 import os
-# import sys
-# import json
-# import shutil
-# import tempfile
-# import traceback
-# import logging
 from typing import Union
-# from pathlib import Path
-# from subprocess import Popen, PIPE
 
-from . import fasta
-from . import helpers
-# from .alphabet import Alphabet
+import igmat.fasta as fasta
+import igmat.helpers as helperst
 
 from igmat.hmm.manager import Manager
 from igmat.hmm.model import Model
-# from src.hmm.parser import Parser as hmmParser
-
-# # Import the HMMER parser from the distributed version of Biopython.
-# try: 
-#     from Bio.SearchIO.HmmerIO import Hmmer3TextParser as HMMERParser
-#     from Bio.SearchIO.HmmerIO import Hmmer3TextIndexer
-# except ImportError as e:
-#     print('Unable to import Biopython. Please install Biopython module.')
-#     sys.exit(1)
 
 def annotate(
   sequence: Union[str, fasta.sequence],

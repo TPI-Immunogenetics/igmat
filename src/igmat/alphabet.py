@@ -22,7 +22,7 @@ class Alphabet:
     if alphabet == 'full':
       return sequence
 
-    if alphabet not in available:
+    if alphabet not in Alphabet.available:
       raise Exception('Invalid alphabet: \'%s\'' % alphabet)
 
     result = ''
@@ -33,11 +33,11 @@ class Alphabet:
         result += char
         continue
 
-      index = available['full'].find(char)
+      index = Alphabet.available['full'].find(char)
       if index < 0:
         raise Exception('Invalid character: \'%s\'' % char)
 
       # Append character
-      result += available[alphabet][index]
+      result += Alphabet.available[alphabet][index]
 
     return result

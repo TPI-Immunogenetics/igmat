@@ -1,21 +1,17 @@
 import os
 import re
 import sys
-# import argparse
 import json
 import traceback
 from subprocess import Popen, PIPE
 
 # from src import fasta
-from . import imgt
-from . import igmat
-from . import fasta
-from .alphabet import Alphabet
+import igmat.imgt as imgt
+import igmat.igmat as igmat
+import igmat.fasta as fasta
+from igmat.alphabet import Alphabet
 
 from igmat.hmm.manager import Manager
-# from src import model
-# from src import alphabet
-# from .fasta import 
 
 urls = { 
   "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species=%s",
