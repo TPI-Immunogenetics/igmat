@@ -1,9 +1,7 @@
-
 import os
 from typing import Union
 
 import igmat.fasta as fasta
-import igmat.helpers as helperst
 
 from igmat.hmm.manager import Manager
 from igmat.hmm.model import Model
@@ -24,7 +22,6 @@ def annotate(
   if isinstance(model, str):
     manager = Manager(hmmerpath)
     model = manager.load(model)
-    # model = HMMmodel(helpers.get_dir_data(), model, hmmerpath)
 
   # Check if the sequence if valid
   if not sequence.isValid():
@@ -78,4 +75,3 @@ def annotate(
   })
 
   return result
-

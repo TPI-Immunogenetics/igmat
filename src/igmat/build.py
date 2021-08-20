@@ -9,6 +9,7 @@ from subprocess import Popen, PIPE
 import igmat.imgt as imgt
 import igmat.igmat as igmat
 import igmat.fasta as fasta
+import igmat.helpers as helpers
 from igmat.alphabet import Alphabet
 
 from igmat.hmm.manager import Manager
@@ -50,7 +51,7 @@ all_tr_species = [
   "Mus",
 ]
 
-file_path  = os.path.split(__file__)[0]
+# file_path  = os.path.split(__file__)[0]
 
 def output_stockholm(all_sequences, path):
 
@@ -546,18 +547,19 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   if (input is not None or alignment is not None) and name == 'IMGT':
     raise Exception('Please provide a different name for a custom model')
 
-  # Check that hmmscan can be found in the path
-  if hmmerpath:
-    scan_path = os.path.join(hmmerpath, "hmmscan")
-    if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
-      raise Exception('No hmmscan executable file found in directory: {path}'.format(path=hmmerpath))
+  # # Check that hmmscan can be found in the path
+  # if hmmerpath:
+  #   scan_path = os.path.join(hmmerpath, "hmmscan")
+  #   if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
+  #     raise Exception('No hmmscan executable file found in directory: {path}'.format(path=hmmerpath))
       
   # except Exception as e:
   #   print('Error - %s' % e)
   #   sys.exit(1)
 
   # # Generate the output path
-  output = os.path.join(file_path, 'data')
+  # output = os.path.join(file_path, 'data')
+  output = helpers.get_dir_data()
   # os.makedirs(output, exist_ok=True)
 
   # Generate the model folder

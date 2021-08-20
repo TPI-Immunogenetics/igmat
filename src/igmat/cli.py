@@ -8,6 +8,7 @@ from .build import build
 from .run import run
 from . import igmat
 from . import helpers
+from . import configs
 
 # Pretty table
 from prettytable import PrettyTable
@@ -88,16 +89,9 @@ def __list(args):
 
   print(table)
 
-
 def main(*args, **kwargs):
 
   parser = argparse.ArgumentParser(prog="IgMAT", formatter_class=argparse.RawDescriptionHelpFormatter)
-  parser.add_argument("-v", "--verbose",
-                    action="store_true",
-                    dest="verbose",
-                    help="run in verbose mode")
-  # parser.add_argument('--verbose', '-v', help='Set verbosity level', dest='verbose', action='count', default=0)
-  parser.add_argument('--hmmerpath','-hp', type=str, default="", help="The path to the directory containing hmmer programs. (including hmmscan)", dest="hmmerpath")
   subparsers = parser.add_subparsers(help='sub-command help', dest='cmd')
   
   # Run command
@@ -109,6 +103,8 @@ def main(*args, **kwargs):
   parser_run.add_argument('--log','-l', type=str, default=False, help="Log annotation results", dest="log")
   parser_run.add_argument('--ncpu','-p', type=int, default=1, help="Number of parallel processes to use. Default is 1.", dest="ncpu")
   parser_run.add_argument('--bit_score_threshold', type=int, default=80, help="Change the bit score threshold used to confirm an alignment should be used.", dest="bit_score_threshold")
+  parser_run.add_argument('--hmmerpath','-hp', type=str, default="", help="The path to the directory containing hmmer programs. (including hmmscan)", dest="hmmerpath")
+  parser_run.add_argument('--verbose', '-v', action="store_true", dest="verbose", help="run in verbose mode")
   parser_run.set_defaults(cmd=__run)
   
   # Build command
@@ -117,13 +113,17 @@ def main(*args, **kwargs):
   parser_build.add_argument('--name','-n', type=str, help="HMM model name", dest="name", required=False, default='IMGT')
   parser_build.add_argument('--alignment', '-a', type=str, help="The alignment file in stockholm format to be used to generate the HMM model", default=None)
   parser_build.add_argument('--alphabet', '-l', type=str, help='Sequence alphabet', dest="alphabet", default='full', choices=Alphabet.list())
+  parser_build.add_argument('--hmmerpath','-hp', type=str, default="", help="The path to the directory containing hmmer programs. (including hmmscan)", dest="hmmerpath")
+  parser_build.add_argument('--verbose', '-v', action="store_true", dest="verbose", help="run in verbose mode")
   parser_build.set_defaults(cmd=__build)
 
   # List command
   parser_list = subparsers.add_parser('list', help='List IgMAT libraries')
-  parser_list.add_argument('-n','--name', type=str, help="HMM model name", dest="name", required=False, default=None)
-  parser_list.add_argument("-c", "--clear", action="store_true", dest="clear", help="Remove all libraries")
-  parser_list.add_argument('-d', '--details', action="store_true", help='Show HMM model details', dest='details')
+  parser_list.add_argument('--name', '-n', type=str, help="HMM model name", dest="name", required=False, default=None)
+  parser_list.add_argument('--clear', '-c', action="store_true", dest="clear", help="Remove all libraries")
+  parser_list.add_argument('--details','-d', action="store_true", help='Show HMM model details', dest='details')
+  parser_list.add_argument('--hmmerpath', '-hp', type=str, default="", help="The path to the directory containing hmmer programs. (including hmmscan)", dest="hmmerpath")
+  parser_list.add_argument('--verbose', '-v', action="store_true", dest="verbose", help="run in verbose mode")
   parser_list.set_defaults(cmd=__list)
 
   # Check input arguments
@@ -133,6 +133,7 @@ def main(*args, **kwargs):
     sys.exit(1)
 
   # Check that hmmscan can be found in the path
+  args.hmmerpath = args.hmmerpath if args.hmmerpath else configs.get('hmmerpath')
   if args.hmmerpath:
     scan_path = os.path.join(args.hmmerpath, "hmmscan")
     if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
@@ -142,7 +143,6 @@ def main(*args, **kwargs):
 
   # Execute sub process
   args.cmd(args)
-
 
 if __name__ == "__main__":
   main()

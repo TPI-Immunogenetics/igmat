@@ -2,12 +2,14 @@ import os
 import sys
 import platform
 from pathlib import Path
+from igmat import configs
 
 def get_root():
   return Path(__file__).parent.parent
 
 def get_dir_data():
-  return os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data')
+  return os.path.join(os.path.expanduser('~'), '.igmat')
+  # return os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data')
 
 # TODO: move to package_data
 # https://stackoverflow.com/questions/14211575/any-python-function-to-get-data-files-root-directory

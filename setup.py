@@ -5,7 +5,8 @@ setup(
     name="IgMAT",
     install_requires=[
         'prettytable',
-        'biopython'
+        'biopython',
+        'pyyaml'
     ],
     extras_require={
     },

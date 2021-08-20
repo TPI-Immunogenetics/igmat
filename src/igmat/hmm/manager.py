@@ -81,6 +81,5 @@ class Manager():
     '''
 
     model = self.load(name)
-    # model = HMMmodel(helpers.get_dir_data(), name)
 
     return model.details
