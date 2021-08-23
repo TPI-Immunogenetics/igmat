@@ -134,11 +134,8 @@ def main(*args, **kwargs):
 
   # Check that hmmscan can be found in the path
   args.hmmerpath = args.hmmerpath if args.hmmerpath else configs.get('hmmerpath')
-  if args.hmmerpath:
-    scan_path = os.path.join(args.hmmerpath, "hmmscan")
-    if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
-      raise Exception("No hmmscan executable file found in directory: %s" % args.hmmerpath)
-  elif not shutil.which("hmmscan"):
+  hmmer_scan = os.path.join(args.hmmerpath, "hmmscan")
+  if not args.hmmerpath or not (os.path.exists(hmmer_scan) and os.access(hmmer_scan, os.X_OK)):
     raise Exception("hmmscan was not found in the path. Either install and add to path or provide path with commandline option.")
 
   # Execute sub process
