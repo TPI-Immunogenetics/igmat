@@ -19,6 +19,12 @@ The default HMM model generated from IMGT data needs to be build in order to run
 Once done, to exit the environment, type:
 
     deactivate
+## Configuration ##
+IgMAT will automatically generate a configuration file in the user home directory: 
+
+    ~/.igmat/config.yaml
+
+All generated hmmer models will be stored in this folder and the configuration file will be automatically initialised with the path containing the hmmer executables. For each one of the cli tools, the option `--hmmerpath` is available to temporarily override the hmmer path.
 
 ## CLI tools ##
 IgMAT comes with a set of cli tools for handling custom HMM models and processing data:
