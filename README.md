@@ -4,6 +4,7 @@ IgMAT is a tool for the automatic discrimination and annotation of antibody sequ
 
 ## Requirements ##
 * Python version 3.8 or greater
+* [Hmmer](http://hmmer.org/download.html)
 
 ## Installing ##
 IgMAT can be installed locally or in a python environment: 
