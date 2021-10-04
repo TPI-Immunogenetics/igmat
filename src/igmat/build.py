@@ -254,11 +254,10 @@ def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
         continue
 
       # Now we need to remove the reference sequence, including any eventual gap
-      # referenceStop = result['details']['query_start']
-      referenceStop = result['start']
+      referenceStop = result.start
       resultStop = 0 
       while referenceStop < len(sequenceData['V'][chain][sequence]):
-        char = result['alignment'][resultStop]
+        char = result.sequence[resultStop]
         if char == '-':
           resultStop += 1
           continue
@@ -268,7 +267,7 @@ def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
           referenceStop += 1
 
       # Trim out the reference sequence
-      sequenceData['V'][chain][sequence] = result['alignment'][:resultStop]
+      sequenceData['V'][chain][sequence] = result.sequence[:resultStop]
 
   # Apply IMGT formatting
   sequenceData = imgt.format(sequenceData)

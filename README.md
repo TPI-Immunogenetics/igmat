@@ -37,3 +37,6 @@ Where `tool` is one of the following:
  - **run**: process the input sequence/file and run the annotation script.
  - **build**: build custom HMM models 
  - **list**: handles the available HMM models
+
+## Examples ##
+IgMAT can be used as a stand alone tool, or embedded into a custom script. Please check the [examples](/docs/examples.md) and a tutorial about [embedding](/docs/embedding.md) IgMAT in your scripts.

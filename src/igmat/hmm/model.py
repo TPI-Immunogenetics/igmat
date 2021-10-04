@@ -6,6 +6,7 @@ import traceback
 from subprocess import Popen, PIPE
 
 from igmat.alphabet import Alphabet
+from igmat.hmm.result import Result
 
 # Import the HMMER parser from the distributed version of Biopython.
 try: 
@@ -112,11 +113,6 @@ class Model():
       if pr_stderr:
           raise Exception(pr_stderr)
 
-      # parser = hmmParser()
-      # parser.run(output_filename)
-      # sys.exit(1)
-
-
       # Parse the result
       parser = Hmmer3TextIndexer(output_filename)
       query = parser.get(0)
@@ -160,18 +156,14 @@ class Model():
       # Validate the alignment
       self.__hmm_validate__(consensus['state'], sequence)
 
-      consensus.update({
-        'hits': hitList
-      })
+      # Annotate the result
+      alignment, annotation = self.__hmm_annotate__(consensus['state'], sequence)
 
-      return consensus
+      return Result(alignment, consensus['start'], consensus['end'], annotation, hitList)
+
+      # return consensus
     finally:
       shutil.rmtree(dirpath)
-      # os.close(output_filehandle)
-
-      # # clean up
-      # os.remove(fasta_filename)
-      # os.remove(output_filename)
         
     # This shouldn't happen
     return None
@@ -442,6 +434,50 @@ class Model():
       'start': state_start,
       'end': state_end
     }
+
+  def __hmm_annotate__(self, state, sequence):
+
+    annotationMap = {
+      1: 'FR1',
+      27: 'CDR1',
+      39: 'FR2',
+      56: 'CDR2',
+      66: 'FR3',
+      105: 'CDR3',
+      118: 'FR4'
+    }
+
+    # Produce annotations
+    annotationList = []
+    current = {'type': None, 'start': 0, 'stop': 0}
+    numbered_size = len(state)
+    # numbered_size = len(result['state'])
+    alignedSequence = ''
+    for j in range(numbered_size): # Iterate over domains
+
+      position = state[j][0][0]
+      # position = result['state'][j][0][0]
+      status = state[j][0][1]
+      # status = result['state'][j][0][1]
+      residue = state[j][1]
+      # residue = result['state'][j][1]
+      if status != '-':
+        alignedSequence += sequence[residue] if residue != None else '-'
+
+      if (position in annotationMap):
+        if current['type'] != None and current['start'] != None and current['stop'] != None:
+          annotationList.append(current)
+
+        current = {'type': annotationMap[position], 'start': residue, 'stop': residue}
+
+      # Update current
+      current['stop'] = residue if residue else current['stop']
+
+    # Append last fragment
+    if current['type'] != None and current['start'] != None and current['stop'] != None:
+      annotationList.append(current)
+
+    return alignedSequence, annotationList
 
   def __hmm_validate__(self, state, sequence):
 

@@ -32,46 +32,4 @@ def annotate(
   if not result:
     raise Exception('Unable to find match')
 
-  annotationMap = {
-    1: 'FR1',
-    27: 'CDR1',
-    39: 'FR2',
-    56: 'CDR2',
-    66: 'FR3',
-    105: 'CDR3',
-    118: 'FR4'
-  }
-
-  # Produce annotations
-  annotationList = []
-  current = {'type': None, 'start': 0, 'stop': 0}
-  numbered_size = len(result['state'])
-  alignedSequence = ''
-  for j in range(numbered_size): # Iterate over domains
-
-    position = result['state'][j][0][0]
-    status = result['state'][j][0][1]
-    residue = result['state'][j][1]
-    if status != '-':
-      alignedSequence += sequence[residue] if residue != None else '-'
-
-    if (position in annotationMap):
-      if current['type'] != None and current['start'] != None and current['stop'] != None:
-        annotationList.append(current)
-
-      current = {'type': annotationMap[position], 'start': residue, 'stop': residue}
-
-    # Update current
-    current['stop'] = residue if residue else current['stop']
-
-  # Append last fragment
-  if current['type'] != None and current['start'] != None and current['stop'] != None:
-    annotationList.append(current)
-  
-  # Merge annotation results
-  result.update({
-    'alignment': alignedSequence,
-    'annotation': annotationList,
-  })
-
   return result

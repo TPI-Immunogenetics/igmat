@@ -39,32 +39,32 @@ class outputWorker(multiprocessing.Process):
     self._stop = multiprocessing.Event()
     self.outputQueue = outputQueue
 
-  def _annotate(self, data, linesize=70):
+  # def _annotate(self, data, linesize=70):
 
-    """ Generate a string representing the aligned sequence with separators """
-    fragmentMap = {}
-    for fragment in data['annotation']:
-      coordinates = (fragment['stop']-data['start'])
-      fragmentMap[coordinates] = fragment['type']
+  #   """ Generate a string representing the aligned sequence with separators """
+  #   fragmentMap = {}
+  #   for fragment in data['annotation']:
+  #     coordinates = (fragment['stop']-data['start'])
+  #     fragmentMap[coordinates] = fragment['type']
 
-    sequence = ''
-    count = 0
-    header = ''
-    for char in data['alignment']:
-      sequence += char
-      if char == '-':
-        continue
+  #   sequence = ''
+  #   count = 0
+  #   header = ''
+  #   for char in data['alignment']:
+  #     sequence += char
+  #     if char == '-':
+  #       continue
 
-      if count in fragmentMap:
+  #     if count in fragmentMap:
         
-        header += fragmentMap[count].center(len(sequence)-len(header), '-') + '|'
-        sequence += '|'
+  #       header += fragmentMap[count].center(len(sequence)-len(header), '-') + '|'
+  #       sequence += '|'
 
-      count += 1
+  #     count += 1
 
-    for i in range(0, len(sequence), linesize):
-      print(' {0:3d} {1} {2:3d}'.format(i+data['start'], header[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
-      print(' {0:3d} {1} {2:3d}\n'.format(i+data['start'], sequence[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
+  #   for i in range(0, len(sequence), linesize):
+  #     print(' {0:3d} {1} {2:3d}'.format(i+data['start'], header[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
+  #     print(' {0:3d} {1} {2:3d}\n'.format(i+data['start'], sequence[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
 
   def run(self):
 
@@ -100,24 +100,25 @@ class outputWorker(multiprocessing.Process):
 
         # Verbose
         if self.kwargs['verbose']:
-
-          # General sequence details
-          print('Query \'%s\':' % data['name'])
-          for hit in data['hits']:
-            print(' HMMR match: {} [eValue: {:.3e}]'.format(hit['id'], hit['evalue']))
-          
-          # Annotations
-          print()
-          self._annotate(data)
+          print('Query \'{name}\':\n'.format(name=data['name']))
+          print(data['data'])
 
         # Store bed file
         if bedHandle:
-          for j in range(len(data['annotation'])):
-            bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(data['name'].replace(' ', '_'), data['annotation'][j]['start']-data['start'], data['annotation'][j]['stop']+1-data['start'], data['annotation'][j]['type']))
+          # for j in range(len(data['annotation'])):
+          for feature in data['data'].annotations():
+            # bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(data['name'].replace(' ', '_'), data['annotation'][j]['start']-data['start'], data['annotation'][j]['stop']+1-data['start'], data['annotation'][j]['type']))
+            bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(
+              data['name'].replace(' ', '_'), 
+              feature['start']-data['data'].start, 
+              feature['stop']+1-data['data'].end, 
+              feature['type']
+            ))
 
         # Store fasta file
         if fastaHandle:
-          sequence = data['sequence'][ data['start']:(data['end']+1)]
+          # sequence = data['sequence'][ data['start']:(data['end']+1)]
+          sequence = data['sequence'][ data['data'].start:(data['data'].end+1)]
           fastaHandle.write('>{name}\n{sequence}\n'.format(name=data['name'].replace(' ', '_'), sequence=sequence))
 
       # Job done
@@ -177,26 +178,25 @@ class processWorker(multiprocessing.Process):
           raise Exception('No annotation found!')
 
         # Append query details
-        data.update({
-          'name': sequence.getName(),
+        self.outputQueue.put({
+          'data': data,
+          'status': 'annotated',
           'sequence': sequence.getSequence(),
-          'status': 'annotated'
+          'name': sequence.getName()
           })
-
-        # Pass result to output queue
-        self.outputQueue.put(data)
 
         # All done
         self.kwargs['result'].increment('success')
 
       except Exception as e:
         logging.error('Error for sequence {name}: {error}'.format(name=sequence.getName(), error=str(e)))
-        # traceback.print_exc()
 
         # Append a result anyway
         self.outputQueue.put({
+          'data': None,
+          'status': 'failed',
           'name': sequence.getName(),
-          'status': 'failed'
+          'sequence': sequence.getSequence()
           })
 
         # Increment the number of failed jobs
@@ -212,23 +212,8 @@ class processWorker(multiprocessing.Process):
 
 def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bit_score_threshold=80, verbose=False, hmmerpath=None):
 
-  # # Set log level
-  # logging.getLogger(__name__).setVerbosity(args.verbose-1)
-  # try:
-
   if not input:
     raise Exception('No input provided')
-
-    # # Check that hmmscan can be found in the path
-    # if args.hmmerpath:
-    #   scan_path = os.path.join(args.hmmerpath, "hmmscan")
-    #   if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
-    #     raise Exception("No hmmscan executable file found in directory: %s" % args.hmmerpath)
-    # elif not shutil.which("hmmscan"):
-    #   raise Exception("hmmscan was not found in the path. Either install and add to path or provide path with commandline option.")
-
-    # if args.annotation and os.path.isdir(args.annotation):
-    #   raise Exception('annotation flag must be a valid filename')
 
   # Check if there should be some restriction as to which chain types should be numbered.
   # If it is not the imgt scheme they want then restrict to only igs (otherwise you'll hit assertion errors)
@@ -240,12 +225,6 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
   # TODO: code cleanup
   restrict = restrictList
 
-    # allowed_species=None
-    # if args.use_species:
-    #   assert args.use_species in all_species, 'Unknown species'
-    #   allowed_species = [args.use_species]
-
-
   # # Get process start time
   # start = time.time()
 
@@ -253,12 +232,7 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
   manager = Manager(hmmerpath)
 
   # Load the HMMR model
-  # try:
-  # dataset = igmat.HMMmodel(helpers.get_dir_data(), model, hmmerpath)
   dataset = manager.load(model)
-  # except Exception as e:
-    # logging.error('Unable to load \'%s\' HMM dataset' % args.model)
-    # sys.exit(1)
 
   # Initialize the result counter
   result = counter.Counter(['total', 'success', 'failed'])
@@ -305,8 +279,6 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
       worker = processWorker(i, workQueue, outputQueue, kwargs={
         'restrict': restrict,
         'dataset':dataset,
-        # 'assign_germline':args.assign_germline,
-        # 'allowed_species': allowed_species,
         'bit_score_threshold': bit_score_threshold,
         'result':result
       })
