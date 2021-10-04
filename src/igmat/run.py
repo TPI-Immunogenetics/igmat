@@ -39,33 +39,6 @@ class outputWorker(multiprocessing.Process):
     self._stop = multiprocessing.Event()
     self.outputQueue = outputQueue
 
-  # def _annotate(self, data, linesize=70):
-
-  #   """ Generate a string representing the aligned sequence with separators """
-  #   fragmentMap = {}
-  #   for fragment in data['annotation']:
-  #     coordinates = (fragment['stop']-data['start'])
-  #     fragmentMap[coordinates] = fragment['type']
-
-  #   sequence = ''
-  #   count = 0
-  #   header = ''
-  #   for char in data['alignment']:
-  #     sequence += char
-  #     if char == '-':
-  #       continue
-
-  #     if count in fragmentMap:
-        
-  #       header += fragmentMap[count].center(len(sequence)-len(header), '-') + '|'
-  #       sequence += '|'
-
-  #     count += 1
-
-  #   for i in range(0, len(sequence), linesize):
-  #     print(' {0:3d} {1} {2:3d}'.format(i+data['start'], header[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
-  #     print(' {0:3d} {1} {2:3d}\n'.format(i+data['start'], sequence[i:i+linesize], data['start']+min(i+linesize, len(sequence))))
-
   def run(self):
 
     # Open output handles
@@ -111,7 +84,7 @@ class outputWorker(multiprocessing.Process):
             bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(
               data['name'].replace(' ', '_'), 
               feature['start']-data['data'].start, 
-              feature['stop']+1-data['data'].end, 
+              feature['stop']+1-data['data'].start, 
               feature['type']
             ))
 
