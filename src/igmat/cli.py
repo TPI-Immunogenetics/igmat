@@ -132,14 +132,19 @@ def main(*args, **kwargs):
     parser.print_help()
     sys.exit(1)
 
-  # Check that hmmscan can be found in the path
-  args.hmmerpath = args.hmmerpath if args.hmmerpath else configs.get('hmmerpath')
-  hmmer_scan = os.path.join(args.hmmerpath, "hmmscan")
-  if not args.hmmerpath or not (os.path.exists(hmmer_scan) and os.access(hmmer_scan, os.X_OK)):
-    raise Exception("hmmscan was not found in the path. Either install and add to path or provide path with commandline option.")
+  try:
 
-  # Execute sub process
-  args.cmd(args)
+    # Check that hmmscan can be found in the path
+    args.hmmerpath = args.hmmerpath if args.hmmerpath else configs.get('hmmerpath', '')
+    hmmer_scan = os.path.join(args.hmmerpath, "hmmscan") if args.hmmerpath else "hmmscan"
+    if not args.hmmerpath or not (os.path.exists(hmmer_scan) and os.access(hmmer_scan, os.X_OK)):
+      raise Exception("hmmscan was not found in the path. Either install and add to path or provide path with commandline option.")
+
+    # Execute sub process
+    args.cmd(args)
+  except Exception as e:
+    print(str(e))
+    sys.exit(1)
 
 if __name__ == "__main__":
   main()

@@ -44,3 +44,11 @@ Thumbs.db
 # Environment files #
 #####################
 /env
+
+# Distribution/packaging
+build/
+develop-eggs/
+eggs/
+*.egg-info/
+.installed.cfg
+*.egg
