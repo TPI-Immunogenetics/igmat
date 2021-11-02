@@ -9,6 +9,8 @@ IgMAT is a tool for the automatic discrimination and annotation of antibody sequ
 ## Installing ##
 IgMAT can be installed locally or in a python environment: 
 
+    git clone git@github.com:TPI-Immunogenetics/igmat.git
+    cd igmat
     python3 -m venv env
     source env/bin/activate
     pip install ./
