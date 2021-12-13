@@ -44,9 +44,11 @@ class outputWorker(multiprocessing.Process):
     # Open output handles
     bedHandle = None
     fastaHandle = None
+    alignHandle = None
     if self.kwargs['annotation']:
       bedHandle = open(self.kwargs['annotation'] + '.bed', 'w+')
       fastaHandle = open(self.kwargs['annotation'] + '.fa', 'w+')
+      alignHandle = open(self.kwargs['annotation'] + '.align.fa', 'w+')
 
     # Open the log file
     logHandle = open(self.kwargs['log'], 'w+') if self.kwargs['log'] else None
@@ -78,9 +80,7 @@ class outputWorker(multiprocessing.Process):
 
         # Store bed file
         if bedHandle:
-          # for j in range(len(data['annotation'])):
           for feature in data['data'].annotations():
-            # bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(data['name'].replace(' ', '_'), data['annotation'][j]['start']-data['start'], data['annotation'][j]['stop']+1-data['start'], data['annotation'][j]['type']))
             bedHandle.write('{0}\t{1}\t{2}\t{3}\n'.format(
               data['name'].replace(' ', '_'), 
               feature['start']-data['data'].start, 
@@ -90,8 +90,12 @@ class outputWorker(multiprocessing.Process):
 
         # Store fasta file
         if fastaHandle:
-          # sequence = data['sequence'][ data['start']:(data['end']+1)]
           sequence = data['sequence'][ data['data'].start:(data['data'].end+1)]
+          fastaHandle.write('>{name}\n{sequence}\n'.format(name=data['name'].replace(' ', '_'), sequence=sequence))
+
+        # Store fasta alignment file
+        if alignHandle:
+          sequence = data['data'].sequence
           fastaHandle.write('>{name}\n{sequence}\n'.format(name=data['name'].replace(' ', '_'), sequence=sequence))
 
       # Job done
@@ -106,6 +110,9 @@ class outputWorker(multiprocessing.Process):
 
     if fastaHandle:
       fastaHandle.close()
+
+    if alignHandle:
+      alignHandle.close()
 
   def stop(self):
     self._stop.set()
@@ -156,7 +163,7 @@ class processWorker(multiprocessing.Process):
           'status': 'annotated',
           'sequence': sequence.getSequence(),
           'name': sequence.getName()
-          })
+        })
 
         # All done
         self.kwargs['result'].increment('success')
@@ -170,7 +177,7 @@ class processWorker(multiprocessing.Process):
           'status': 'failed',
           'name': sequence.getName(),
           'sequence': sequence.getSequence()
-          })
+        })
 
         # Increment the number of failed jobs
         self.kwargs['result'].increment('failed')
