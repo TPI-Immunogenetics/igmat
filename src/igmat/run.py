@@ -96,7 +96,7 @@ class outputWorker(multiprocessing.Process):
         # Store fasta alignment file
         if alignHandle:
           sequence = data['data'].sequence
-          fastaHandle.write('>{name}\n{sequence}\n'.format(name=data['name'].replace(' ', '_'), sequence=sequence))
+          alignHandle.write('>{name}\n{sequence}\n'.format(name=data['name'].replace(' ', '_'), sequence=sequence))
 
       # Job done
       self.outputQueue.task_done()

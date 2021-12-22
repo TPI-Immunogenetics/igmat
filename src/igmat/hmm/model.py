@@ -61,7 +61,6 @@ class Model():
 
         name = line[1]
         species, chain = name.split('_')
-        # size = int(line[5])
         self._dataset[name] = {
           'nseq': int(line[3]),
           'species': species,
@@ -451,24 +450,24 @@ class Model():
     annotationList = []
     current = {'type': None, 'start': 0, 'stop': 0}
     numbered_size = len(state)
-    # numbered_size = len(result['state'])
     alignedSequence = ''
     for j in range(numbered_size): # Iterate over domains
 
       position = state[j][0][0]
-      # position = result['state'][j][0][0]
       status = state[j][0][1]
-      # status = result['state'][j][0][1]
       residue = state[j][1]
-      # residue = result['state'][j][1]
       if status != '-':
         alignedSequence += sequence[residue] if residue != None else '-'
 
-      if (position in annotationMap):
+
+      annotation_key = annotationMap.pop(position, None)
+      if annotation_key:
+      # if (position in annotationMap):
         if current['type'] != None and current['start'] != None and current['stop'] != None:
           annotationList.append(current)
 
-        current = {'type': annotationMap[position], 'start': residue, 'stop': residue}
+        current = {'type': annotation_key, 'start': residue, 'stop': residue}
+        # current = {'type': annotationMap[position], 'start': residue, 'stop': residue}
 
       # Update current
       current['stop'] = residue if residue else current['stop']
