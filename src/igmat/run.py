@@ -42,13 +42,9 @@ class outputWorker(multiprocessing.Process):
   def run(self):
 
     # Open output handles
-    bedHandle = None
-    fastaHandle = None
-    alignHandle = None
-    if self.kwargs['annotation']:
-      bedHandle = open(self.kwargs['annotation'] + '.bed', 'w+')
-      fastaHandle = open(self.kwargs['annotation'] + '.fa', 'w+')
-      alignHandle = open(self.kwargs['annotation'] + '.align.fa', 'w+')
+    bedHandle = open(self.kwargs['annotation'] + '.bed', 'w+') if self.kwargs['annotation'] else None
+    fastaHandle = open(self.kwargs['annotation'] + '.fa', 'w+') if self.kwargs['annotation'] else None
+    alignHandle = open(self.kwargs['annotation'] + '.align.fa', 'w+') if self.kwargs['annotation'] else None
 
     # Open the log file
     logHandle = open(self.kwargs['log'], 'w+') if self.kwargs['log'] else None
@@ -113,6 +109,9 @@ class outputWorker(multiprocessing.Process):
 
     if alignHandle:
       alignHandle.close()
+
+    if logHandle:
+      logHandle.close()
 
   def stop(self):
     self._stop.set()
