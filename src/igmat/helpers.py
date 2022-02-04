@@ -20,9 +20,10 @@ def get_dir_binary(filename):
   if osname == 'linux' and 'microsoft' in platform.uname().release.lower():
     osname = 'win32'
 
-  # result = os.path.abspath(os.path.join(get_root(), 'bin', osname, filename))
   result = os.path.abspath(os.path.join(sys.prefix, 'muscle', osname, filename))
   if not os.path.exists(result):
-    raise Exception('Unable to find binary for {filename} and OS {osname}'.format(filename=filename, osname=osname))
+    print('Unable to find binary for {filename} and OS {osname}. Fallback to local'.format(filename=filename, osname=osname))
+    return filename
+    # raise Exception('Unable to find binary for {filename} and OS {osname}'.format(filename=filename, osname=osname))
 
   return result

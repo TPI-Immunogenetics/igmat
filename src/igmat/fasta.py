@@ -14,6 +14,9 @@ class sequence:
   def getSequence(self):
     return self.sequence
 
+  def getSize(self):
+    return len(self.sequence)
+
   def getHash(self):
     return hash(self.sequence)
 

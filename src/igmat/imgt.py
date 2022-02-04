@@ -283,12 +283,15 @@ def extractIMGTFasta(url, filename, retry=3):
   parser = IMGTDBParser()
   sequences = parser.rip_sequences(data.decode('utf-8'))
   if not sequences:
-    raise Exception('No sequences available for URL \'%s\'' % url)
+    raise Exception('No sequences available for URL \'{url}\''.format(url=url))
   
   # All good, store fasta file
   with open(filename, "w") as outfile:
     for name, sequence in sequences:
-      outfile.write('>%s\n' % name)
-      outfile.write('%s\n' % sequence)
+      # Cleanup name
+      name = name[1:] if name[0] == '>' else name
+
+      # Store fasta
+      outfile.write('>{name}\n{sequence}\n'.format(name=name, sequence=sequence))
 
   return True

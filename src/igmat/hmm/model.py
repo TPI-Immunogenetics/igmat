@@ -1,5 +1,7 @@
 import os
+import sys
 import json
+import math
 import tempfile
 import shutil
 import traceback
@@ -7,6 +9,7 @@ from subprocess import Popen, PIPE
 
 from igmat.alphabet import Alphabet
 from igmat.hmm.result import Result
+from igmat.hmm.mapper import Mapper
 
 # Import the HMMER parser from the distributed version of Biopython.
 try: 
@@ -116,26 +119,41 @@ class Model():
       parser = Hmmer3TextIndexer(output_filename)
       query = parser.get(0)
 
+      domainMap = {}
+      domainMask = ['*'] * sequence.getSize()
+
       # Iterate over the matches of the domains in order of their e-value (most significant first)
-      domainList = []
-      hitList = []
       for hsp in sorted(query.hsps, key=lambda x: x.evalue):
 
         # Skipping matches different to the top one
-        if hitList and hitList[0]['id'] != hsp.hit_id:
+        species, ctype = hsp.hit_id.split('_')
+        hitMask = [ '' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
+        overlaps = True if len(''.join(hitMask)) > 0 else False
+        if (hsp.hit_id not in domainMap) and overlaps:
           continue
 
+        if hsp.hit_id not in domainMap:
+          domainMap[hsp.hit_id] = {
+            'type': ctype,
+            'start': -1,
+            'end': -1,
+            'evalue': None,
+            'species': species,
+            'hits': [],
+            'list': []
+          }
+
         # Check if in the exclude list
-        species, ctype = hsp.hit_id.split('_')
         if restrict and ctype not in restrict:
           logging.info('skipping chain {chain}'.format(chain=ctype))
           continue
 
         # This is a valid domain
-        domainList.append(hsp)
-
-        # Store hit
-        hitList.append({
+        domainMask = [ ('*' if domainMask[i] == '*' and (i < hsp.query_start or i >= hsp.query_end) else '-') for i in range(sequence.getSize()) ]
+        domainMap[hsp.hit_id]['start'] = min(hsp.query_start, domainMap[hsp.hit_id]['start']) if domainMap[hsp.hit_id]['start'] >= 0 else hsp.query_start
+        domainMap[hsp.hit_id]['end'] = max(hsp.query_end, domainMap[hsp.hit_id]['end']) if domainMap[hsp.hit_id]['end'] >= 0 else hsp.query_end
+        domainMap[hsp.hit_id]['evalue'] = min(hsp.evalue, domainMap[hsp.hit_id]['evalue']) if domainMap[hsp.hit_id]['evalue'] else hsp.evalue
+        domainMap[hsp.hit_id]['hits'].append({
           'id': hsp.hit_id,
           'description': hsp.hit_description,
           'evalue': hsp.evalue,
@@ -145,29 +163,42 @@ class Model():
           'end': hsp.query_end
         })
 
+        domainMap[hsp.hit_id]['list'].append(hsp)
+
       # No valid match found
-      if not domainList:
+      if not domainMap:
         return None
 
-      # Generate a consensus of the found domains
-      consensus = self.__hmm_align__(domainList, query.seq_len)
+      resultList = []
+      for key in domainMap:
 
-      # Validate the alignment
-      self.__hmm_validate__(consensus['state'], sequence)
+        # Check the match seed evalue
+        if domainMap[key]['evalue'] > 1e-10:
+          continue
+        
+        # Generate a consensus of the found domains
+        consensus = self.__hmm_align__(domainMap[key]['list'], query.seq_len, sequence)
+        if not consensus:
+          return None
 
-      # Annotate the result
-      alignment, annotation = self.__hmm_annotate__(consensus['state'], sequence)
+        # Validate the alignment
+        self.__hmm_validate__(consensus['state'], sequence)
 
-      return Result(alignment, consensus['start'], consensus['end'], annotation, hitList)
+        # Annotate the result
+        alignment, annotation = self.__hmm_annotate__(consensus['state'], sequence)
 
-      # return consensus
+        match = Result(alignment, consensus['start'], consensus['end'], annotation, domainMap[key]['hits'])
+        resultList.append(match)
+
+      return resultList
+
     finally:
       shutil.rmtree(dirpath)
         
     # This shouldn't happen
     return None
 
-  def __hmm_align__(self, hspList, seq_length):
+  def __hmm_align__(self, hspList, seq_length, sequence):
 
     regionMap = {
       'FR1': {'start': 0, 'stop': 26},
@@ -175,8 +206,8 @@ class Model():
       'FR2': {'start': 38, 'stop': 55},
       'CDR2': {'start': 55, 'stop': 65},
       'FR3': {'start': 65, 'stop': 104},
-      'CDR3': {'start': 104, 'stop': 116},
-      'FR4': {'start': 116, 'stop': 128}
+      'CDR3': {'start': 104, 'stop': 117},
+      'FR4': {'start': 117, 'stop': 127}
     }
 
     stateList = []
@@ -185,6 +216,10 @@ class Model():
       # Extract the strings for the reference states and the posterior probability strings     
       reference_string = hsp.aln_annotation["RF"]
       state_string = hsp.aln_annotation["PP"]
+
+      # print(reference_string)
+      # print(state_string)
+      # print(hsp.hit_start, hsp.hit_end, hsp.query_start, hsp.query_end)
 
       # Extract the start an end points of the hmm states and the sequence
       # These are python indices i.e list[ start:end ] and therefore start will be one less than in the text file
@@ -249,7 +284,7 @@ class Model():
           'type': state_type,
           'idx': sequence_index,
           'score': score
-          })    
+        })
 
         # Updates to the indices         
         if state_type == "m":
@@ -260,10 +295,12 @@ class Model():
         else: # delete state
           h+=1
 
+      # if len(stateList) == 0:
       stateList.append(state)
 
+    mapper = Mapper(sequence)
 
-    state_vector = {}
+    # state_vector = {}
     regionList = list(regionMap.keys())
     for state in stateList:
 
@@ -287,6 +324,8 @@ class Model():
         if state_start and state_start['hmm'] > region['start']+1:
           for i in range(region['start']+1, min(region['stop']+1, state_start['hmm'])):
             stateRegion['vector'].append({'hmm': i, 'type': '-', 'idx': None, 'score': 0})
+            # print('Adding {0} to {1}'.format(i, region_name))
+
 
         # Assemble region and calculate score
         stateSize = 0
@@ -305,134 +344,19 @@ class Model():
           stateRegion['vector'].append(state[i])
 
         # Add any eventual missing end position
-        state_stop = state[-1] if len(state) > 0 else None
-        if state_stop and state_stop['hmm'] < region['stop']+1:
-          for i in range(state_stop['hmm'], region['stop']+1):
+        state_stop = stateRegion['vector'][-1] if len(stateRegion['vector']) > 0 else None
+        if state_stop and (state_stop['hmm']+1) < region['stop']:
+          for i in range(state_stop['hmm']+1, region['stop']+1):
             stateRegion['vector'].append({'hmm': i, 'type': '-', 'idx': None, 'score': 0})
 
-        # Check if the region is complete
-        if len(stateRegion['vector']) == 0 or stateRegion['vector'][0]['hmm']-1 > region['start'] or stateRegion['vector'][-1]['hmm'] < region['stop']:
-          print('Incomplete region: {name}'.format(name=region_name))
-          continue
-
+        # # Check if the region is complete
         if stateRegion['size'] == 0:
           continue
 
-        # Check if the region is continuous
-        if region_name in state_vector:
-
-          # Check if contiguous with prev region
-          if (region_prev and region_prev in state_vector) and state_vector[region_prev]['stop'] > stateRegion['start']:
-            continue
-
-          # Check if contiguous with next region
-          if (region_next and region_next in state_vector) and stateRegion['stop'] > state_vector[region_next]['start']:
-            continue
-
-        # This is the best region so far
-        if region_name not in state_vector or state_vector[region_name]['score'] < stateRegion['score']:
-          prev_score = 0 if (region_name not in state_vector) else state_vector[region_name]['score']
-          state_vector[region_name] = stateRegion
-
-    # Check for non contiguous regions
-    # This fixes problems when aligning two or more hmms and something is overlapping
-    prev_valid = None
-    prev_region = None
-    for region_name in state_vector:
-      
-      first_valid = None
-      last_valid = None
-      for state in state_vector[region_name]['vector']:
-        first_valid = first_valid if first_valid and first_valid['idx'] else state
-        first_valid = first_valid if first_valid and first_valid['idx'] else None
-        last_valid = state if state['idx'] else last_valid
-
-      # This region is not contiguous, it needs to be removed
-      if prev_valid and first_valid and (first_valid['idx']-prev_valid['idx'] > 1):
+        # Append to mapper
+        mapper.append(region_name, stateRegion)
         
-        region_remove = region_name if region_name in ['CDR1', 'CDR2', 'CDR3'] else prev_region
-        if region_remove:
-          state_vector[ region_remove ]['vector'] = []
-          for i in range(regionMap[region_remove]['start'], regionMap[region_remove]['stop']):
-            state_vector[ region_remove ]['vector'].append({
-              'hmm': i+1,
-              'type': '-',
-              'idx': None,
-              'score': 0
-              })
-
-      # Update for next
-      prev_region = region_name
-      prev_valid = last_valid if last_valid else prev_valid
-
-    # Convert the result map to a tuple list
-    # To be noted:
-    # - hmm is one-based
-    # - idx is zero-based
-    result = []
-    for key, value in state_vector.items():
-      for state in value['vector']:
-        result.append(((state['hmm'], state['type']), state['idx']))
-
-    # Fill in the missing bits
-    position=0
-    state_start=-1
-    state_end=0
-    while position < len(result):
-
-      # Update start and end position on the query sequence
-      state_start = state_start if (state_start != None and state_start >= 0) else result[position][-1]
-      state_end = result[position][-1] if result[position][-1] else state_end
-      
-      # Get position
-      prev = { 'pos': position-1, 'hmm': result[position-1][0][0], 'idx': result[position-1][1], 'type': result[position-1][0][1]} if position > 0 else None
-      curr = { 'pos': position, 'hmm': result[position][0][0], 'idx': result[position][1], 'type': result[position][0][1]}
-      if curr['type'] != '-':
-        position += 1
-        continue
-
-      # There is nothing before
-      if prev is None or prev['idx'] is None:
-        position += 1
-        continue
-
-      # This is an invalid position, try to find the next valid position
-      last = None
-      while position < len(result):
-        last = { 'pos': position, 'hmm': result[position][0][0], 'idx': result[position][1], 'type': result[position][0][1]}
-        if last['type'] != '-':
-          break
-
-        last = None
-        position += 1
-
-      if last is None:
-        position += 1
-        continue
-
-      if not last['idx']:
-        continue
-
-      idx = prev['idx']+1
-      state_pos = curr['pos']
-      hmm_pos = curr['hmm']
-      while idx < last['idx']:
-
-        if result[state_pos][0][1] != '-':
-          result.insert(state_pos, ((hmm_pos, 'i'), idx))
-          state_pos += 1
-        else:
-          result[state_pos] = ((hmm_pos, 'm'), idx)
-          state_pos += 1
-          hmm_pos += 1
-
-        idx += 1
-
-    return {
-      'state': result,
-      'start': state_start,
-      'end': state_end
-    }
+    return mapper.process()
 
   def __hmm_annotate__(self, state, sequence):
 
@@ -456,20 +380,17 @@ class Model():
       position = state[j][0][0]
       status = state[j][0][1]
       residue = state[j][1]
-      if status != '-':
-        alignedSequence += sequence[residue] if residue != None else '-'
-
+      alignedSequence += sequence[residue] if residue != None else '-'
 
       annotation_key = annotationMap.pop(position, None)
       if annotation_key:
-      # if (position in annotationMap):
         if current['type'] != None and current['start'] != None and current['stop'] != None:
           annotationList.append(current)
 
         current = {'type': annotation_key, 'start': residue, 'stop': residue}
-        # current = {'type': annotationMap[position], 'start': residue, 'stop': residue}
 
       # Update current
+      current['start'] = current['start'] if current['start'] else residue
       current['stop'] = residue if residue else current['stop']
 
     # Append last fragment
@@ -501,13 +422,19 @@ class Model():
 
   @property
   def details(self):
+    '''
+    Returns the model details
+    '''
     return self._dataset
 
   def size(self, species, chain):
+    '''
+    Returns the model size for a specific pair of species and chain names
+    '''
 
     name = '{species}_{chain}'.format(species=species, chain=chain)
     if name not in self._dataset:
-      raise Exception('Unable to find %s %s in HMMR model' % (species, chain))
+      raise Exception('Unable to find {0}-{1} in HMMR model'.format(species, chain))
 
     return self._dataset[name]['size']
     

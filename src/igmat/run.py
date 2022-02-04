@@ -150,25 +150,34 @@ class processWorker(multiprocessing.Process):
       try:
 
         # Process sequence
-        data = igmat.annotate(sequence, self.kwargs['dataset'],
+        dataList = igmat.annotate(sequence, self.kwargs['dataset'],
           restrict=self.kwargs['restrict'],
           threshold=self.kwargs['bit_score_threshold'])
-        if data is None:
+        if dataList is None:
           raise Exception('No annotation found!')
 
-        # Append query details
-        self.outputQueue.put({
-          'data': data,
-          'status': 'annotated',
-          'sequence': sequence.getSequence(),
-          'name': sequence.getName()
-        })
+        for item in dataList:
+          self.outputQueue.put({
+            'data': item,
+            'status': 'annotated',
+            'sequence': sequence.getSequence(),
+            'name': sequence.getName()
+          })
+
+        # # Append query details
+        # self.outputQueue.put({
+        #   'data': data,
+        #   'status': 'annotated',
+        #   'sequence': sequence.getSequence(),
+        #   'name': sequence.getName()
+        # })
 
         # All done
         self.kwargs['result'].increment('success')
 
       except Exception as e:
         logging.error('Error for sequence {name}: {error}'.format(name=sequence.getName(), error=str(e)))
+        print(traceback.format_exc())
 
         # Append a result anyway
         self.outputQueue.put({

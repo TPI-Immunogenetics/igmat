@@ -15,20 +15,20 @@ from igmat.alphabet import Alphabet
 from igmat.hmm.manager import Manager
 
 urls = { 
-  "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species=%s",
-  "HJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGHJ&species=%s",
-  "KV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGKV&species=%s",
-  "KJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGKJ&species=%s",
-  "LV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGLV&species=%s",
-  "LJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGLJ&species=%s",
-  "AV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRAV&species=%s",
-  "AJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRAJ&species=%s",
-  "BV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRBV&species=%s",
-  "BJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRBJ&species=%s",
-  "GV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRGV&species=%s",
-  "GJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRGJ&species=%s",
-  "DV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRDV&species=%s",
-  "DJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRDJ&species=%s"
+  "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species={species}",
+  "HJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGHJ&species={species}",
+  "KV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGKV&species={species}",
+  "KJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGKJ&species={species}",
+  "LV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGLV&species={species}",
+  "LJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGLJ&species={species}",
+  "AV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRAV&species={species}",
+  "AJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRAJ&species={species}",
+  "BV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRBV&species={species}",
+  "BJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRBJ&species={species}",
+  "GV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRGV&species={species}",
+  "GJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRGJ&species={species}",
+  "DV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRDV&species={species}",
+  "DJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRDJ&species={species}"
 }
 
 # Species as of 04-12-14
@@ -106,14 +106,10 @@ def getIMGTData(path, verbose=False):
       if chain_type in "ABGD" and species not in all_tr_species: 
         continue
 
-      # Alpacas don't have light chains
-      #if chain_type in "KL" and species == "Vicugna+pacos":
-       # continue 
-
       try:
 
         filename = os.path.join(path, "{species}_{gene}.fasta".format(species=species.replace("+", "_"), gene=gene_type))
-        if not imgt.extractIMGTFasta(urls[gene_type]%species, filename):
+        if not imgt.extractIMGTFasta(urls[gene_type].format(species=species), filename):
           raise Exception('Unable to extract %s %s from IMGT' % (species, gene_type))
 
         # All done
@@ -121,17 +117,17 @@ def getIMGTData(path, verbose=False):
         if region_type not in sequenceData:
           sequenceData[region_type] = {}
 
-        #sequenceData[region_type][(species, chain_type)] = imgt.parseIMGTFasta(filename)
         records = {}
-        #warningCount = 0
         for sequence in fasta.parse(filename):
 
           # Parse sequence name
-          #fields = dict(list(zip( imgt_fields, sequence.getName().split("|"))) )
           fields = [x.strip() for x in sequence.getName().split("|")]
           fields = dict(list(zip(imgt_fields, fields)))
 
-          # These are the ones we care about and will be used
+          # Filter out sequences
+          isPartial = True if fields['partial'] else False
+          isReverse = True if fields['reverse'] else False
+          isGermline = True if fields["allele"].split("*")[-1].strip() == "01" else False
           try:
 
             # Check sequence validity
@@ -142,9 +138,20 @@ def getIMGTData(path, verbose=False):
             if fields['accession_number'] == 'None':
               raise Warning('Unknown accession number')
 
+            # print(isPartial, isReverse, isGermline)
+            # if fields['allele'] == 'IGHV1-198*01':
+            #   print(fields)
+            #   sys.exit(1)
+            #   
+            
             # Skip non functional, incomplete or reverse sequences
-            if fields["functionality"] != "F" or fields["partial"] or fields["reverse"]:
-              raise Warning('Non-functional [functionality=\'%s\'], partial [partial=\'%s\'] or reverse [reverse=\'%s\'] sequence' % (fields['functionality'], fields['partial'], fields['reverse']))
+            if fields["functionality"] != "F" or isPartial or isReverse:
+              raise Warning('Non-functional [functionality=\'{0}\'], partial [partial=\'{1}\'] or reverse [reverse=\'{2}\'] sequence'.format(
+                fields['functionality'], 
+                fields['partial'],
+                fields['reverse']
+              ))
+
 
             # TODO: find a better way to exclude extremely similar sequences
             # if read_all:
@@ -157,15 +164,11 @@ def getIMGTData(path, verbose=False):
           
           except Warning as e:
 
-            #warningCount += 1
             if verbose:
-              print(' Warning: sequence %s: %s' % (fields["allele"], e))
+              print(' Warning: sequence {0}: {1}'.format(fields['allele'], str(e)))
 
         # Store sequence data
         sequenceData[region_type][(species, chain_type)] = records
-
-        #if warningCount:
-        #  print('Found %d warnings while importing IMGT data.' % warningCount)
 
       except Exception as e:
         traceback.print_exc()
@@ -384,12 +387,36 @@ def generateAlignment(sequences, path, isIMGT=False, alph='full'):
 
 def validateAlignment(path, verbose=False):
 
+  # ruleList = {
+  #   23: ['C'],
+  #   41: ['W'],
+  #   89: ['A', 'I', 'L', 'M', 'F', 'W', 'Y', 'V', 'P'],
+  #   104: ['C'],
+  #   118: ['F', 'W']
+  # }
+  # 
+
   ruleList = {
-    23: ['C'],
-    41: ['W'],
-    89: ['A', 'I', 'L', 'M', 'F', 'W', 'Y', 'V', 'P'],
-    104: ['C'],
-    118: ['F', 'W']
+    23: {
+      'residues': ['C'],
+      'critic': True
+    },
+    41: {
+      'residues': ['W'],
+      'critic': False
+    },
+    89: {
+      'residues': ['A', 'I', 'L', 'M', 'F', 'W', 'Y', 'V', 'P'],
+      'critic': False
+    },
+    104: {
+      'residues': ['C'],
+      'critic': True
+    },
+    118: {
+      'residues': ['F', 'W'],
+      'critic': False
+    }
   }
 
   try:
@@ -398,6 +425,7 @@ def validateAlignment(path, verbose=False):
     if not os.path.exists(path):
       raise Exception('Unable to find alignment file')
 
+    filename = os.path.basename(path)
     with open(path, 'r') as handle:
 
       count = 0
@@ -421,29 +449,41 @@ def validateAlignment(path, verbose=False):
 
         head = line[0]
         sequence = line[1]
-        
         for index in ruleList:
 
           try:
                     
-            if sequence[index-1] not in ruleList[index]:
-              raise Warning('Position %d must be one of: %s' % (index, ','.join(ruleList[index])))
+            if sequence[index-1] not in ruleList[index]['residues']:
+
+              message = 'Line {0}: position {1} must be one of \'{2}\''.format(
+                count,
+                index,
+                ','.join(ruleList[index]['residues'])
+                )
+              raise (Exception(message) if ruleList[index]['critic'] else Warning(message))
+              # raise exception
+              # if ruleList[index]['critic']:
+              #   raise Exception('')
+              # raise Warning('Position {0} must be one of: {1}'.format(
+              #   index,
+              #   ','.join(ruleList[index])
+              #   ))
 
           except Warning as w:
 
             warningCount += 1
             if verbose:
-              print('Warning [line %d]: %s' % (count, w))
+              print('Warning {0}: {1}'.format(filename, w))
               print('  ' + sequence)
               print('  ' + (' ' * (index-1) + '*'))
             
 
   except Exception as e:
-    print('Error validating alignment: %s' % e)
+    print('Error validating alignment {0}: {1}'.format(filename, str(e)))
     return False
 
   if warningCount:
-    print('Found %d warnings while validating data. Please check the alignment' % warningCount)
+    print('Found {0} warnings while validating data. Please check the alignment'.format(warningCount))
 
   return True
 
@@ -518,20 +558,7 @@ def generateDatafile(name, sequences, filename, alph):
   with open(filename, 'w') as outfile:
     json.dump(data, outfile, indent=2)
 
-# if __name__ == "__main__":
 def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, verbose=False):
-
-  # parser = argparse.ArgumentParser(prog="build")
-  # parser.add_argument('--input','-i', type=str, help="Input sequence folder", dest="input", required=False, default=None)
-  # parser.add_argument('--name','-n', type=str, help="HMM model name", dest="name", required=False, default='IMGT')
-  # parser.add_argument('--hmmerpath','-hp', type=str, help="The path to the directory containing hmmer programs. (including hmmscan)", dest="hmmerpath", default="")
-  # parser.add_argument('--alignment', '-a', type=str, help="The alignment file in stockholm format to be used to generate the HMM model", default=None)
-  # parser.add_argument('--verbose', '-v', action='store_true', help='Set program verbosity', dest="verbose", default=False)
-  # parser.add_argument('--alphabet', '-l', type=str, help='Sequence alphabet', dest="alphabet", default='full', choices=alphabet.available.keys())
-
-  # args = parser.parse_args()
-
-  # try:
 
   # Check input folder
   if input is not None:
@@ -546,21 +573,9 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   if (input is not None or alignment is not None) and name == 'IMGT':
     raise Exception('Please provide a different name for a custom model')
 
-  # # Check that hmmscan can be found in the path
-  # if hmmerpath:
-  #   scan_path = os.path.join(hmmerpath, "hmmscan")
-  #   if not (os.path.exists(scan_path) and os.access(scan_path, os.X_OK)):
-  #     raise Exception('No hmmscan executable file found in directory: {path}'.format(path=hmmerpath))
-      
-  # except Exception as e:
-  #   print('Error - %s' % e)
-  #   sys.exit(1)
-
-  # # Generate the output path
-  # output = os.path.join(file_path, 'data')
+  # Generate the output path
   output = helpers.get_dir_data()
-  # os.makedirs(output, exist_ok=True)
-
+  
   # Generate the model folder
   modelName = name + ('_' + alphabet if alphabet != 'full' else '')
   modelPath = os.path.join(output, modelName)
