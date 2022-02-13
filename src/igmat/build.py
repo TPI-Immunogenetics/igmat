@@ -1,11 +1,12 @@
 import os
 import re
 import sys
+import shutil
 import json
 import traceback
+import urllib.request
 from subprocess import Popen, PIPE
 
-# from src import fasta
 import igmat.imgt as imgt
 import igmat.igmat as igmat
 import igmat.fasta as fasta
@@ -14,42 +15,42 @@ from igmat.alphabet import Alphabet
 
 from igmat.hmm.manager import Manager
 
-urls = { 
-  "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species={species}",
-  "HJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGHJ&species={species}",
-  "KV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGKV&species={species}",
-  "KJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGKJ&species={species}",
-  "LV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGLV&species={species}",
-  "LJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGLJ&species={species}",
-  "AV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRAV&species={species}",
-  "AJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRAJ&species={species}",
-  "BV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRBV&species={species}",
-  "BJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRBJ&species={species}",
-  "GV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRGV&species={species}",
-  "GJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRGJ&species={species}",
-  "DV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRDV&species={species}",
-  "DJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRDJ&species={species}"
-}
+# urls = { 
+#   "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species={species}",
+#   "HJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGHJ&species={species}",
+#   "KV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGKV&species={species}",
+#   "KJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGKJ&species={species}",
+#   "LV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGLV&species={species}",
+#   "LJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGLJ&species={species}",
+#   "AV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRAV&species={species}",
+#   "AJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRAJ&species={species}",
+#   "BV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRBV&species={species}",
+#   "BJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRBJ&species={species}",
+#   "GV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRGV&species={species}",
+#   "GJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRGJ&species={species}",
+#   "DV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRDV&species={species}",
+#   "DJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRDJ&species={species}"
+# }
 
-# Species as of 04-12-14
-# Species as of 02-06-16 - alpaca added
-# These are retrieved for all the antibodies
-all_species = [
-  "Homo+sapiens",
-  "Mus",
-  "Rattus+norvegicus",
-  "Oryctolagus+cuniculus",
-  "Macaca+mulatta",
-  "Sus+scrofa",
-  "Vicugna+pacos",
-  # "Bos+taurus",
-  "Ovis+aries"  # Added 08-2020
-]
+# # Species as of 04-12-14
+# # Species as of 02-06-16 - alpaca added
+# # These are retrieved for all the antibodies
+# all_species = [
+#   "Homo+sapiens",
+#   "Mus",
+#   "Rattus+norvegicus",
+#   "Oryctolagus+cuniculus",
+#   "Macaca+mulatta",
+#   "Sus+scrofa",
+#   "Vicugna+pacos",
+#   # "Bos+taurus",
+#   "Ovis+aries"  # Added 08-2020
+# ]
 
-all_tr_species = [
-  "Homo+sapiens",
-  "Mus",
-]
+# all_tr_species = [
+#   "Homo+sapiens",
+#   "Mus",
+# ]
 
 # file_path  = os.path.split(__file__)[0]
 
@@ -75,109 +76,68 @@ def output_stockholm(all_sequences, path):
 
   return path
 
-def getIMGTData(path, verbose=False):
+def getIMGTData(path, verbose=False, hmmerpath=None):
 
-  imgt_fields =  [
-    "accession_number",
-    "allele",  
-    "species",  
-    "functionality",  
-    "region",  
-    "start_and_end_positions_IMGT/LIGM-DB_accession_number", 
-    "number_of_nucleotides", 
-    "codon_start", 
-    "number_nucleotides_added_in_5'_compared_IMGT/LIGM-DB", 
-    "number_nucleotides_added_in_3'_compared_IMGT/LIGM-DB", 
-    "number_nucleotides_to_correct_sequencing_errors", 
-    "number_of_amino_acids", 
-    "number_of_characters", 
-    "partial",  
-    "reverse"
-  ]
+  base_url = 'https://raw.githubusercontent.com/TPI-Immunogenetics/igmat_dataset/master/'
+  try:
 
-  # For all V and J gene types (H,K,L,A,B,G,D) parse IMGT database and extract fasta files
-  sequenceData = {}
-  for gene_type in urls:
-    for species in all_species:
+    # Parse github list file
+    fileList = []
+    count = 0
+    with urllib.request.urlopen(base_url + 'dist/list.txt') as handle:
+      for line in handle:
+        if count == 0:
+          count += 1
+          continue
 
-      # We don't want TCRs for all organisms
-      chain_type = gene_type[0]
-      region_type = gene_type[1]
-      if chain_type in "ABGD" and species not in all_tr_species: 
-        continue
+        line = line.decode('utf-8').strip().split('\t')
+        fileList.append({
+          'name': line[0],
+          'path': line[1],
+          'chain': line[2].split(',')
+        })
+        count += 1
 
-      try:
+    # Downloading data
+    chainList = []
+    for species in fileList:
 
-        filename = os.path.join(path, "{species}_{gene}.fasta".format(species=species.replace("+", "_"), gene=gene_type))
-        if not imgt.extractIMGTFasta(urls[gene_type].format(species=species), filename):
-          raise Exception('Unable to extract %s %s from IMGT' % (species, gene_type))
+      print('Downloading data for {0}'.format(species['name']))
+      file_path = os.path.join(path, species['path'])
+      with urllib.request.urlopen(base_url + 'dist/' + species['path']) as handle, open(file_path, 'wb') as out_handle:
+        shutil.copyfileobj(handle, out_handle)
 
-        # All done
-        print("Parsed and saved %s %s" % (species, gene_type))
-        if region_type not in sequenceData:
-          sequenceData[region_type] = {}
+      # Update chain list
+      chainList = list(set(chainList+species['chain']))
 
-        records = {}
-        for sequence in fasta.parse(filename):
+    # Concatenate files
+    concat_path = os.path.join(path, 'IMGT.sto')
+    with open(concat_path, 'wb') as out_handle:
+      for species in fileList:
+        with open(os.path.join(path, species['path']), 'rb') as handle:
+          shutil.copyfileobj(handle, out_handle)
 
-          # Parse sequence name
-          fields = [x.strip() for x in sequence.getName().split("|")]
-          fields = dict(list(zip(imgt_fields, fields)))
+    # Generate an HMM model with all the aligned sequences
+    print('Generating IMGT reference HMM model')
+    if not generateModel(concat_path, 'IMGT', os.path.join(path, '../'), hmmerpath):
+      raise Exception('Unable to generate HMM model')
 
-          # Filter out sequences
-          isPartial = True if fields['partial'] else False
-          isReverse = True if fields['reverse'] else False
-          isGermline = True if fields["allele"].split("*")[-1].strip() == "01" else False
-          try:
-
-            # Check sequence validity
-            if not sequence.isValid(gap=True):
-              raise Warning('Invalid sequence')
-
-            # Skip sequence with no accession number
-            if fields['accession_number'] == 'None':
-              raise Warning('Unknown accession number')
-
-            # print(isPartial, isReverse, isGermline)
-            # if fields['allele'] == 'IGHV1-198*01':
-            #   print(fields)
-            #   sys.exit(1)
-            #   
-            
-            # Skip non functional, incomplete or reverse sequences
-            if fields["functionality"] != "F" or isPartial or isReverse:
-              raise Warning('Non-functional [functionality=\'{0}\'], partial [partial=\'{1}\'] or reverse [reverse=\'{2}\'] sequence'.format(
-                fields['functionality'], 
-                fields['partial'],
-                fields['reverse']
-              ))
-
-
-            # TODO: find a better way to exclude extremely similar sequences
-            # if read_all:
-            #   pass
-            # elif fields["allele"].split("*")[-1].strip()!="01": 
-            #   raise Warning('Skipping allele %s' % fields['allele'])
-
-            # All good, store sequence
-            records[ (fields["species"], fields["allele"] ) ] = sequence.getSequence()
+    # Compile a file with the dataset properties and a dictionary containing all the v and j germline sequences.
+    germlinePath = os.path.join(path, '../', 'IMGT.json')
+    data = {
+      'name': 'IMGT',
+      'alphabet': 'full',
+      'chain': chainList,
+      'J': {},
+      'V': {}
+    }
           
-          except Warning as e:
+    # Write to file
+    with open(germlinePath, 'w') as outfile:
+      json.dump(data, outfile, indent=2)
 
-            if verbose:
-              print(' Warning: sequence {0}: {1}'.format(fields['allele'], str(e)))
-
-        # Store sequence data
-        sequenceData[region_type][(species, chain_type)] = records
-
-      except Exception as e:
-        traceback.print_exc()
-        print('Error while extracting IMGT data: %s' % e)
-
-  print('Formatting IMGT data')
-  sequenceData = imgt.format(sequenceData)
-
-  return sequenceData
+  except Exception as e:
+    print('Error fetching IMGT data: {0}'.format(str(e)))
 
 def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
 
@@ -588,26 +548,27 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   sequenceData = None
   isIMGT = True if name == 'IMGT' else False
   if isIMGT:
-    sequenceData = getIMGTData(modelPath, verbose)
-  else:
+    return getIMGTData(modelPath, verbose)
+    # sequenceData = getIMGTData(modelPath, verbose)
+  # else:
 
-    # Generate the alignment from input data
-    if input:
+  # Generate the alignment from input data
+  if input:
 
-      # Load the IMGT HMMER model
-      # try:
-      # dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
-      dataset = manager.load('IMGT')
-      # except Exception:
-        # print('Unable to find IMGT HMM model. Please run the build script without arguments first.')
-        # sys.exit()
+    # Load the IMGT HMMER model
+    # try:
+    # dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
+    dataset = manager.load('IMGT')
+    # except Exception:
+      # print('Unable to find IMGT HMM model. Please run the build script without arguments first.')
+      # sys.exit()
 
-      sequenceData = getCustomData(input, modelPath, dataset, verbose)
+    sequenceData = getCustomData(input, modelPath, dataset, verbose)
 
-    # Load the alignment file
-    elif alignment:
+  # Load the alignment file
+  elif alignment:
 
-      sequenceData = getAlignmentData(alignment)
+    sequenceData = getAlignmentData(alignment)
 
   # try:
 

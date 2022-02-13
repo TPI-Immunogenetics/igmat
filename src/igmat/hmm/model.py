@@ -63,7 +63,10 @@ class Model():
           continue
 
         name = line[1]
-        species, chain = name.split('_')
+        # species, chain = name.split('_')
+        speciesList = name.split('_')
+        chain = speciesList.pop()
+        species = '_'.join(speciesList)
         self._dataset[name] = {
           'nseq': int(line[3]),
           'species': species,
@@ -126,7 +129,12 @@ class Model():
       for hsp in sorted(query.hsps, key=lambda x: x.evalue):
 
         # Skipping matches different to the top one
-        species, ctype = hsp.hit_id.split('_')
+        # species, ctype = hsp.hit_id.split('_')
+        nameList = hsp.hit_id.split('_')
+        ctype = nameList.pop()
+        species = '_'.join(nameList)
+
+
         hitMask = [ '' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
         overlaps = True if len(''.join(hitMask)) > 0 else False
         if (hsp.hit_id not in domainMap) and overlaps:
@@ -230,7 +238,12 @@ class Model():
       _seq_end = hsp.query_end
 
       # Extact the full length of the HMM hit
-      species, ctype = hsp.hit_id.split('_')
+      # species, ctype = hsp.hit_id.split('_')
+
+
+      nameList = hsp.hit_id.split('_')
+      ctype = nameList.pop()
+      species = '_'.join(nameList)
       _hmm_length = self.size(species, ctype)
 
       # Handle cases where there are n terminal modifications.

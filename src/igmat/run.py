@@ -177,7 +177,7 @@ class processWorker(multiprocessing.Process):
 
       except Exception as e:
         logging.error('Error for sequence {name}: {error}'.format(name=sequence.getName(), error=str(e)))
-        print(traceback.format_exc())
+        # print(traceback.format_exc())
 
         # Append a result anyway
         self.outputQueue.put({
