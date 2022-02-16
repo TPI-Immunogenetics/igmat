@@ -129,15 +129,31 @@ class Model():
       for hsp in sorted(query.hsps, key=lambda x: x.evalue):
 
         # Skipping matches different to the top one
-        # species, ctype = hsp.hit_id.split('_')
         nameList = hsp.hit_id.split('_')
         ctype = nameList.pop()
         species = '_'.join(nameList)
 
+        # Check if the hit is an extension of a seed
+        if hsp.hit_id in domainMap:
+          skip_hit = False
+          for hit_id in domainMap:
+            if hit_id == hsp.hit_id:
+              continue 
+
+            if (hsp.query_start > domainMap[hit_id]['start'] and hsp.query_start < domainMap[hit_id]['end']) or (hsp.query_end > domainMap[hit_id]['start'] and hsp.query_end < domainMap[hit_id]['end']):
+              skip_hit = True
+              break
+
+          if skip_hit:
+            continue
+
+
 
         hitMask = [ '' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
         overlaps = True if len(''.join(hitMask)) > 0 else False
-        if (hsp.hit_id not in domainMap) and overlaps:
+        # if (hsp.hit_id not in domainMap) and overlaps:
+        if overlaps:
+          # print('Overlapping')
           continue
 
         if hsp.hit_id not in domainMap:
@@ -225,6 +241,7 @@ class Model():
       reference_string = hsp.aln_annotation["RF"]
       state_string = hsp.aln_annotation["PP"]
 
+      # print(hsp)
       # print(reference_string)
       # print(state_string)
       # print(hsp.hit_start, hsp.hit_end, hsp.query_start, hsp.query_end)

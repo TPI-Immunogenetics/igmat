@@ -15,45 +15,6 @@ from igmat.alphabet import Alphabet
 
 from igmat.hmm.manager import Manager
 
-# urls = { 
-#   "HV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGHV&species={species}",
-#   "HJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGHJ&species={species}",
-#   "KV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGKV&species={species}",
-#   "KJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGKJ&species={species}",
-#   "LV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+IGLV&species={species}",
-#   "LJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+IGLJ&species={species}",
-#   "AV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRAV&species={species}",
-#   "AJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRAJ&species={species}",
-#   "BV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRBV&species={species}",
-#   "BJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRBJ&species={species}",
-#   "GV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRGV&species={species}",
-#   "GJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRGJ&species={species}",
-#   "DV": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.3+TRDV&species={species}",
-#   "DJ": "http://www.imgt.org/IMGT_GENE-DB/GENElect?query=7.6+TRDJ&species={species}"
-# }
-
-# # Species as of 04-12-14
-# # Species as of 02-06-16 - alpaca added
-# # These are retrieved for all the antibodies
-# all_species = [
-#   "Homo+sapiens",
-#   "Mus",
-#   "Rattus+norvegicus",
-#   "Oryctolagus+cuniculus",
-#   "Macaca+mulatta",
-#   "Sus+scrofa",
-#   "Vicugna+pacos",
-#   # "Bos+taurus",
-#   "Ovis+aries"  # Added 08-2020
-# ]
-
-# all_tr_species = [
-#   "Homo+sapiens",
-#   "Mus",
-# ]
-
-# file_path  = os.path.split(__file__)[0]
-
 def output_stockholm(all_sequences, path):
 
   # Output a minimal stockholm alignment file for all sequences. 

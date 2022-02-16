@@ -156,12 +156,13 @@ class processWorker(multiprocessing.Process):
         if dataList is None:
           raise Exception('No annotation found!')
 
-        for item in dataList:
+        for idx, value in enumerate(dataList):
+          sequence_name = sequence.getName() if len(dataList) == 1 else '{0}_{1}'.format(sequence.getName(),idx+1)
           self.outputQueue.put({
-            'data': item,
+            'data': value,
             'status': 'annotated',
             'sequence': sequence.getSequence(),
-            'name': sequence.getName()
+            'name': sequence_name
           })
 
         # # Append query details
