@@ -37,7 +37,7 @@ def output_stockholm(all_sequences, path):
 
   return path
 
-def getIMGTData(path, verbose=False, hmmerpath=None):
+def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
 
   base_url = 'https://raw.githubusercontent.com/TPI-Immunogenetics/igmat_dataset/master/'
   try:
@@ -75,8 +75,27 @@ def getIMGTData(path, verbose=False, hmmerpath=None):
     concat_path = os.path.join(path, 'IMGT.sto')
     with open(concat_path, 'wb') as out_handle:
       for species in fileList:
-        with open(os.path.join(path, species['path']), 'rb') as handle:
-          shutil.copyfileobj(handle, out_handle)
+        with open(os.path.join(path, species['path']), 'r') as handle:
+          for line in handle:
+            line = line.rstrip()
+            if line[0] == '#' or line.startswith('//'):
+              out_handle.write(line)
+              continue
+            
+            if alphabet == 'full':
+              out_handle.write(line)
+              continue
+            
+            # Convert to reduced alphabet
+            lineSize = len(line)
+            line = line.split()
+            sequence = Alphabet.reduce(line[1], alphabet)
+            
+            out_handle.write('{0}{1}'.format(
+              line[0].ljust(lineSize-len(sequence)),
+              sequence
+            ))
+          # shutil.copyfileobj(handle, out_handle)
 
     # Generate an HMM model with all the aligned sequences
     print('Generating IMGT reference HMM model')
@@ -87,12 +106,12 @@ def getIMGTData(path, verbose=False, hmmerpath=None):
     germlinePath = os.path.join(path, '../', 'IMGT.json')
     data = {
       'name': 'IMGT',
-      'alphabet': 'full',
+      'alphabet': alphabet,
       'chain': chainList,
       'J': {},
       'V': {}
     }
-          
+
     # Write to file
     with open(germlinePath, 'w') as outfile:
       json.dump(data, outfile, indent=2)
@@ -308,15 +327,6 @@ def generateAlignment(sequences, path, isIMGT=False, alph='full'):
 
 def validateAlignment(path, verbose=False):
 
-  # ruleList = {
-  #   23: ['C'],
-  #   41: ['W'],
-  #   89: ['A', 'I', 'L', 'M', 'F', 'W', 'Y', 'V', 'P'],
-  #   104: ['C'],
-  #   118: ['F', 'W']
-  # }
-  # 
-
   ruleList = {
     23: {
       'residues': ['C'],
@@ -509,29 +519,19 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
   sequenceData = None
   isIMGT = True if name == 'IMGT' else False
   if isIMGT:
-    return getIMGTData(modelPath, verbose)
-    # sequenceData = getIMGTData(modelPath, verbose)
-  # else:
+    return getIMGTData(modelPath, alphabet, verbose)
 
   # Generate the alignment from input data
   if input:
 
     # Load the IMGT HMMER model
-    # try:
-    # dataset = igmat.HMMmodel(output, 'IMGT', hmmerpath)
     dataset = manager.load('IMGT')
-    # except Exception:
-      # print('Unable to find IMGT HMM model. Please run the build script without arguments first.')
-      # sys.exit()
-
     sequenceData = getCustomData(input, modelPath, dataset, verbose)
 
   # Load the alignment file
   elif alignment:
 
     sequenceData = getAlignmentData(alignment)
-
-  # try:
 
   # Generate an alignment with all the combinations of V and J regions
   alignPath = os.path.join(modelPath, modelName + '.stockholm')
@@ -548,11 +548,6 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
     raise Exception('Unable to generate HMM model')
 
   # Compile a file with the dataset properties and a dictionary containing all the v and j germline sequences.
-  # germlinePath =  os.path.join(output, args.name + '.json')
   germlinePath = os.path.join(output, modelName + '.json')
   print('Generating data file \'%s\'' % modelName)
   generateDatafile(modelName, sequenceData, germlinePath, alph=alphabet)
-
-  # except Exception as e:
-  #   print('Error - %s' % e)
-  #   sys.exit(1)
