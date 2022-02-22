@@ -72,18 +72,19 @@ def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
       chainList = list(set(chainList+species['chain']))
 
     # Concatenate files
-    concat_path = os.path.join(path, 'IMGT.sto')
-    with open(concat_path, 'wb') as out_handle:
+    modelName = 'IMGT' + ('_' + alphabet if alphabet != 'full' else '')
+    concat_path = os.path.join(path, modelName + '.sto')
+    with open(concat_path, 'w') as out_handle:
       for species in fileList:
         with open(os.path.join(path, species['path']), 'r') as handle:
           for line in handle:
             line = line.rstrip()
             if line[0] == '#' or line.startswith('//'):
-              out_handle.write(line)
+              out_handle.write(line + '\n')
               continue
             
             if alphabet == 'full':
-              out_handle.write(line)
+              out_handle.write(line + '\n')
               continue
             
             # Convert to reduced alphabet
@@ -91,21 +92,21 @@ def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
             line = line.split()
             sequence = Alphabet.reduce(line[1], alphabet)
             
-            out_handle.write('{0}{1}'.format(
+            out_handle.write('{0}{1}\n'.format(
               line[0].ljust(lineSize-len(sequence)),
               sequence
             ))
           # shutil.copyfileobj(handle, out_handle)
 
     # Generate an HMM model with all the aligned sequences
-    print('Generating IMGT reference HMM model')
-    if not generateModel(concat_path, 'IMGT', os.path.join(path, '../'), hmmerpath):
+    print('Generating IMGT reference HMM model \'{0}\''.format(modelName))
+    if not generateModel(concat_path, modelName, os.path.join(path, '../'), hmmerpath):
       raise Exception('Unable to generate HMM model')
 
     # Compile a file with the dataset properties and a dictionary containing all the v and j germline sequences.
-    germlinePath = os.path.join(path, '../', 'IMGT.json')
+    germlinePath = os.path.join(path, '../', modelName + '.json')
     data = {
-      'name': 'IMGT',
+      'name': modelName,
       'alphabet': alphabet,
       'chain': chainList,
       'J': {},
