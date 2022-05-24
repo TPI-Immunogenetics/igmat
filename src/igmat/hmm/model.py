@@ -8,6 +8,7 @@ import traceback
 from subprocess import Popen, PIPE
 
 from igmat.alphabet import Alphabet
+import igmat.helpers as helpers
 from igmat.hmm.result import Result
 from igmat.hmm.mapper import Mapper
 
@@ -42,9 +43,10 @@ class Model():
         raise Exception('Unable to find hmmer model.')
 
       # Run hmmer as a subprocess
-      hmmstat = "hmmstat"
-      if self.hmmerpath:
-        hmmstat = os.path.join(self.hmmerpath, hmmstat)
+      hmmstat = helpers.get_bin_path('hmmstat', self.hmmerpath)
+      # hmmstat = "hmmstat"
+      # if self.hmmerpath:
+      #   hmmstat = os.path.join(self.hmmerpath, hmmstat)
 
       command = [ hmmstat, hmmerpath]
       process = Popen( command, stdout=PIPE, stderr=PIPE)
@@ -94,9 +96,10 @@ class Model():
   def run(self, sequence, threshold=0, restrict=[]):
 
     # Run hmmer as a subprocess
-    hmmscan = "hmmscan"
-    if self.hmmerpath:
-      hmmscan = os.path.join(self.hmmerpath, hmmscan)
+    hmmscan = helpers.get_bin_path('hmmscan', self.hmmerpath)
+    # hmmscan = "hmmscan"
+    # if self.hmmerpath:
+    #   hmmscan = os.path.join(self.hmmerpath, hmmscan)
 
     try:
 

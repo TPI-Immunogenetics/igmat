@@ -7,6 +7,7 @@ import traceback
 import urllib.request
 from subprocess import Popen, PIPE
 
+import igmat.helpers as helpers
 import igmat.imgt as imgt
 import igmat.igmat as igmat
 import igmat.fasta as fasta
@@ -429,7 +430,8 @@ def generateModel(alignment, name, path, hmmerpath=""):
       raise Exception('Unable to find input alignment for hmmbuild')
 
     # Run hmmer as a subprocess
-    hmmbuild = os.path.join(hmmerpath, "hmmbuild") if hmmerpath else "hmmbuild"
+    hmmbuild = helpers.get_bin_path('hmmbuild', hmmerpath)
+    # hmmbuild = os.path.join(hmmerpath, "hmmbuild") if hmmerpath else "hmmbuild"
     command = [ hmmbuild, "--hand", HMMPath, alignment]
     process = Popen(command, stdout=PIPE, stderr=PIPE)
     _, pr_stderr = process.communicate()
@@ -438,7 +440,8 @@ def generateModel(alignment, name, path, hmmerpath=""):
         raise Exception(pr_stderr)
 
     # Turn the output HMMs file into a binary form.
-    hmmpress = os.path.join(hmmerpath, "hmmpress") if hmmerpath else "hmmpress"
+    # hmmpress = os.path.join(hmmerpath, "hmmpress") if hmmerpath else "hmmpress"
+    hmmpress = helpers.get_bin_path('hmmpress', hmmerpath)
     command = [ hmmpress, "-f", HMMPath]
     process = Popen(command, stdout=PIPE, stderr=PIPE)
     _, pr_stderr = process.communicate()
