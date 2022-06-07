@@ -79,10 +79,18 @@ class Mapper():
 
       # Check if all regions are continuous
       isValid = True
+      prev_item = None
       for i in range(region_size):
-        prev_item = solution[(i-1)] if i > 0 else None
-        next_item = solution[(i+1)] if i+1 < region_size else None
+        # prev_item = solution[(i-1)] if i > 0 else None
+        # next_item = solution[(i+1)] if i+1 < region_size else None
+        # curr_item = solution[i]
+
         curr_item = solution[i]
+        next_item = None
+        for j in range(i+1, region_size):
+          next_item = solution[j]
+          if next_item['size'] > 0:
+            break
 
         # Check if previous region is contiguous
         if (prev_item and prev_item['size'] > 0 and curr_item['size'] > 0) and prev_item['stop'] > curr_item['start']:
@@ -93,6 +101,8 @@ class Mapper():
         if (next_item and next_item['size'] > 0 and curr_item['size'] > 0) and next_item['start'] < curr_item['stop']:
           isValid = False
           break
+
+        prev_item = curr_item
 
       # Append solution
       if isValid:
@@ -118,10 +128,11 @@ class Mapper():
 
     # Add empty region where missing
     for i in range(len(self._map)):
+      
+      # if len(self._map[i]['list']) == 0:
+      # print('Missing region: {0}'.format(self._map[i]['name']))
+      self._map[i]['list'].append(self._createRegion(self._map[i]['name']))
       # print(i, self._map[i]['name'],len(self._map[i]['list']))
-      if len(self._map[i]['list']) == 0:
-        # print('Missing region: {0}'.format(self._map[i]['name']))
-        self._map[i]['list'].append(self._createRegion(self._map[i]['name']))
 
     # Generate all combination of regions
     for i in range(len(self._map[0]['list'])):
@@ -137,8 +148,6 @@ class Mapper():
 
       # The current solution
       state_vector = self._solutionList[k]
-
-      # self._debugState(state_vector)
 
       # Check for non contiguous regions
       # This fixes problems when aligning two or more hmms and something is overlapping
@@ -231,8 +240,6 @@ class Mapper():
 
         # Update state vector
         state_vector[region_index]['vector'] = orderedList
-
-      # self._debugState(state_vector)
       
       # Fill in the missing bits
       state_start=-1
@@ -368,7 +375,7 @@ class Mapper():
         'mask': solutionMask,
         'start': solutionScore[k]['start'],
         'end': solutionScore[k]['end'],
-        'index': k #len(resultList)
+        'index': k
       })
 
       # Valid solution
