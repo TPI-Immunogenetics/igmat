@@ -52,7 +52,13 @@ def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
           count += 1
           continue
 
-        line = line.decode('utf-8').strip().split('\t')
+        line = line.decode('utf-8').strip()
+        if line.startswith('#'):
+          print('Skipping line {count}: {line}..'.format(count=count, line=line[:10]))
+          count += 1
+          continue
+          
+        line = line.split('\t')
         fileList.append({
           'name': line[0],
           'path': line[1],
