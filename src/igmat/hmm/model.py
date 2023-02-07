@@ -19,6 +19,16 @@ except ImportError as e:
   print('Unable to import Biopython. Please install Biopython module.')
   sys.exit(1)
 
+def hmmer_path(name, hmmerpath=None):
+  if hmmerpath:
+    return os.path.join(hmmerpath, name)
+
+  # Try to fetch path
+  result = shutil.which(name)
+  result = name if not result else result
+  
+  return result
+
 class Model():
 
   def __init__(self, path, model='IMGT', hmmerpath=None):
@@ -42,9 +52,10 @@ class Model():
         raise Exception('Unable to find hmmer model.')
 
       # Run hmmer as a subprocess
-      hmmstat = "hmmstat"
-      if self.hmmerpath:
-        hmmstat = os.path.join(self.hmmerpath, hmmstat)
+      hmmstat = hmmer_path('hmmstat', self.hmmerpath)
+      # hmmstat = "hmmstat"
+      # if self.hmmerpath:
+      #   hmmstat = os.path.join(self.hmmerpath, hmmstat)
 
       command = [ hmmstat, hmmerpath]
       process = Popen( command, stdout=PIPE, stderr=PIPE)
@@ -94,9 +105,10 @@ class Model():
   def run(self, sequence, threshold=0, restrict=[]):
 
     # Run hmmer as a subprocess
-    hmmscan = "hmmscan"
-    if self.hmmerpath:
-      hmmscan = os.path.join(self.hmmerpath, hmmscan)
+    hmmscan = hmmer_path('hmmscan', self.hmmerpath)
+    # hmmscan = "hmmscan"
+    # if self.hmmerpath:
+    #   hmmscan = os.path.join(self.hmmerpath, hmmscan)
 
     try:
 
@@ -211,7 +223,7 @@ class Model():
         # Annotate the result
         alignment, annotation = self.__hmm_annotate__(consensus['state'], sequence)
 
-        match = Result(alignment, consensus['start'], consensus['end'], annotation, domainMap[key]['hits'])
+        match = Result(alignment, consensus['start'], consensus['end'], annotation, domainMap[key]['type'], domainMap[key]['hits'])
         resultList.append(match)
 
       return resultList

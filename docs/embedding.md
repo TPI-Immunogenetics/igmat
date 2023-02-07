@@ -4,7 +4,7 @@ This example shows how to embed IgMAT in your code.
 
 ```python
 
-from igmat import igmat
+from igmat.igmat import igmat
 
 # The sequence that needs to be annotated
 sequence = "DVQLVESGGGSVQAGGSLRLSCAVSGSTYSPCTTGWYRQAPGKEREWVSSISSPGTIYYQDSVKGRFTISRDNAKNTVYLQMNSLQREDTGMYYCQIQCGVRSIREYWGQGTQVTVSSHHHHHH"

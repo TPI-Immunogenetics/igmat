@@ -2,6 +2,8 @@
 import os
 import shutil
 from igmat.config import Config
+# from igmat.igmat import annotate
+# from igmat.igmat import *
 
 '''
 Load the configuration file and return a dictionary

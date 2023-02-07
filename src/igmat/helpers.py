@@ -21,6 +21,7 @@ def get_dir_binary(filename):
     osname = 'win32'
 
   result = os.path.abspath(os.path.join(sys.prefix, 'muscle', osname, filename))
+  print(result)
   if not os.path.exists(result):
     print('Unable to find binary for {filename} and OS {osname}. Fallback to local'.format(filename=filename, osname=osname))
     return filename

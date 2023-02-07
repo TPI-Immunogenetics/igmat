@@ -1,11 +1,12 @@
 
 class Result():
 
-  def __init__(self, sequence, start, end, annotation, hitList=None):
+  def __init__(self, sequence, start, end, annotation, type, hitList=None):
     self._sequence = sequence
     self._start = start
     self._end = end
     self._list = annotation
+    self._type = type
     self._hitList = hitList
 
   @property
@@ -19,6 +20,10 @@ class Result():
   @property
   def end(self):
     return self._end
+
+  @property
+  def type(self):
+    return self._type
 
   def annotations(self):
     '''
