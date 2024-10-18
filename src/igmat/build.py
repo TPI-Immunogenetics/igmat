@@ -37,27 +37,53 @@ def output_stockholm(all_sequences, path):
 
   return path
 
+def parse_stockholm(input_path):
+  chain_list = []
+  try:
+    with open(input_path, 'r') as file:
+      for line in file:
+        line = line.strip()
+        if line.startswith('#=GF ID '):
+          sequence_id = line.replace('#=GF ID ', '')
+          species, chain = sequence_id.split('_')
+          chain_list.append(chain)
+
+    return {
+      'chain': chain_list
+    }
+
+  except FileNotFoundError:
+    print(f"File {input_path} not found.")
+    return None
+      
 def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
+  
+  if verbose:
+    print('Downloading curated alignment data from igmat repository')
 
   base_url = 'https://raw.githubusercontent.com/TPI-Immunogenetics/igmat_dataset/master/'
   try:
 
     # Parse github list file
     fileList = []
-    count = 0
     with urllib.request.urlopen(base_url + 'dist/list.txt') as handle:
+      header = None
       for line in handle:
-        if count == 0:
-          count += 1
+        line = line.decode('utf-8').rstrip('\n')
+        if header is None:
+          header = line.split('\t')
+          continue
+        
+        # Skip line
+        if line.startswith('#'):
           continue
 
-        line = line.decode('utf-8').strip().split('\t')
+        data = dict(zip(header, line.split('\t')))
         fileList.append({
-          'name': line[0],
-          'path': line[1],
-          'chain': line[2].split(',')
+          'name': data['species'],
+          'path': data['path'],
+          'chain': data['chain'].split(',')
         })
-        count += 1
 
     # Downloading data
     chainList = []
@@ -96,7 +122,6 @@ def getIMGTData(path, alphabet, verbose=False, hmmerpath=None):
               line[0].ljust(lineSize-len(sequence)),
               sequence
             ))
-          # shutil.copyfileobj(handle, out_handle)
 
     # Generate an HMM model with all the aligned sequences
     print('Generating IMGT reference HMM model \'{0}\''.format(modelName))
@@ -135,7 +160,7 @@ def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
     if not file.endswith((".fa",".fasta",".fas")):
       continue
 
-    name = os.path.splitext(file)[0];
+    name = os.path.splitext(file)[0]
     match = re.search("^(\w+)\_(\w)([JV])$", name)
     if not match:
       continue
@@ -216,7 +241,7 @@ def getCustomData(inputPath, modelPath, imgtModel, verbose=False):
   # Apply IMGT formatting
   sequenceData = imgt.format(sequenceData)
 
-  return sequenceData;
+  return sequenceData
 
 def getAlignmentData(path):
 
@@ -283,7 +308,7 @@ def getAlignmentData(path):
 
   return sequenceData
 
-def generateAlignment(sequences, path, isIMGT=False, alph='full'):
+def generateAlignment(sequences, output_path, isIMGT=False, alph='full'):
 
   if not sequences:
     raise Exception('Empty alignment data')
@@ -324,7 +349,7 @@ def generateAlignment(sequences, path, isIMGT=False, alph='full'):
     results[ (species, chain_type) ] = combined_sequences
 
   # Write just the V and J combinations
-  output_stockholm(results, path);
+  output_stockholm(results, output_path)
 
 def validateAlignment(path, verbose=False):
 
@@ -451,7 +476,7 @@ def generateModel(alignment, name, path, hmmerpath=""):
 
   return True
 
-def generateDatafile(name, sequences, filename, alph):
+def generateDatafile(name, sequences, filename, alignment_path, alph):
 
   data = {
     'name': name,
@@ -463,6 +488,9 @@ def generateDatafile(name, sequences, filename, alph):
 
   # Store sequence data
   for chain in ['V', 'J']:
+    if (sequences is None) or (chain not in sequences):
+      continue
+    
     for species, chain_type in sequences[chain]:
       for ((_,gene), seq) in sequences[chain][ (species, chain_type) ].items():
 
@@ -486,11 +514,17 @@ def generateDatafile(name, sequences, filename, alph):
           assert len(seq)==20
           data[chain][chain_type][species][gene] = "-"*108 + seq.replace(".","-")
         
+  # If needed, parse the alignment file
+  alignment_format = helpers.get_alignment_format(alignment_path)
+  if alignment_format == 'stockholm':
+    stockholm_data = parse_stockholm(alignment_path)
+    data['chain'] = stockholm_data['chain']
+    
   # Write to file
   with open(filename, 'w') as outfile:
     json.dump(data, outfile, indent=2)
 
-def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, verbose=False):
+def build(name, input=None, alignment_path=None, alphabet='full', hmmerpath=None, verbose=False):
 
   # Check input folder
   if input is not None:
@@ -498,11 +532,11 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
     if not os.path.exists(input) or not os.path.isdir(input):
       raise Exception('The input argument must be a valid directory!')
 
-    if alignment is not None:
+    if alignment_path is not None:
       raise Exception('Please provide either an alignment file or an input folder')
 
   # Check model name
-  if (input is not None or alignment is not None) and name == 'IMGT':
+  if (input is not None or alignment_path is not None) and name == 'IMGT':
     raise Exception('Please provide a different name for a custom model')
 
   # Generate the output path
@@ -518,6 +552,7 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
 
   # Extract data from the provided input
   sequenceData = None
+  alignPath = None
   isIMGT = True if name == 'IMGT' else False
   if isIMGT:
     return getIMGTData(modelPath, alphabet, verbose)
@@ -530,25 +565,36 @@ def build(name, input=None, alignment=None, alphabet='full', hmmerpath=None, ver
     sequenceData = getCustomData(input, modelPath, dataset, verbose)
 
   # Load the alignment file
-  elif alignment:
-
-    sequenceData = getAlignmentData(alignment)
+  elif alignment_path:
+    if verbose:
+      print('Loading aligment from input')
+      
+    alignment_format = helpers.get_alignment_format(alignment_path)
+    if alignment_format == None:
+      raise Exception('Invalid alignment format')
+      
+    # Try and parse the input fasta alignment
+    if alignment_format == 'fasta':
+      sequenceData = getAlignmentData(alignment_path)
+    elif alignment_format == 'stockholm':
+      alignPath = alignment_path
 
   # Generate an alignment with all the combinations of V and J regions
-  alignPath = os.path.join(modelPath, modelName + '.stockholm')
-  print('Generating alignment data')
-  generateAlignment(sequenceData, alignPath, isIMGT, alph=alphabet)
-
+  if sequenceData is not None:
+    alignPath = os.path.join(modelPath, modelName + '.stockholm')
+    print('Generating alignment data')
+    generateAlignment(sequenceData, alignPath, isIMGT, alph=alphabet)
+    
   # Validate the generated alignment
   if not validateAlignment(alignPath, verbose):
     raise Exception('Invalid alignment data')
 
   # Generate an HMM model with all the aligned sequences
-  print('Generating HMM model \'%s\'' % modelName)
+  print('Generating HMM model \'{}\''.format(modelName))
   if not generateModel(alignPath, modelName, output):
     raise Exception('Unable to generate HMM model')
 
   # Compile a file with the dataset properties and a dictionary containing all the v and j germline sequences.
   germlinePath = os.path.join(output, modelName + '.json')
-  print('Generating data file \'%s\'' % modelName)
-  generateDatafile(modelName, sequenceData, germlinePath, alph=alphabet)
+  print('Generating data file \'{}\''.format(modelName))
+  generateDatafile(modelName, sequenceData, germlinePath, alignPath, alph=alphabet)

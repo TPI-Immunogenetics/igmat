@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import argparse
+import traceback
 
 from .alphabet import Alphabet
 from .build import build
@@ -37,7 +38,7 @@ def __build(args):
   # Execute the build script
   build(args.name, 
     input=args.input, 
-    alignment=args.alignment, 
+    alignment_path=args.alignment, 
     alphabet=args.alphabet, 
     hmmerpath=args.hmmerpath, 
     verbose=args.verbose
@@ -143,6 +144,10 @@ def main(*args, **kwargs):
     # Execute sub process
     args.cmd(args)
   except Exception as e:
+    
+    if args.verbose:
+      traceback.print_exc()
+      
     print(str(e))
     sys.exit(1)
 

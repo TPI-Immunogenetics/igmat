@@ -106,9 +106,6 @@ class Model():
 
     # Run hmmer as a subprocess
     hmmscan = hmmer_path('hmmscan', self.hmmerpath)
-    # hmmscan = "hmmscan"
-    # if self.hmmerpath:
-    #   hmmscan = os.path.join(self.hmmerpath, hmmscan)
 
     try:
 

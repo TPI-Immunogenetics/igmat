@@ -42,3 +42,18 @@ Where `tool` is one of the following:
 
 ## Examples ##
 IgMAT can be used as a stand alone tool, or embedded into a custom script. Please check the [examples](/docs/examples.md) and a tutorial about [embedding](/docs/embedding.md) IgMAT in your scripts.
+
+## Creating a custom database ##
+To create a custom database, you will either need a fasta file containing the V and J fragments for each chain, or a pre-computed alignment in Stockholm format:
+
+- Create a custom database `bos` with data from a fasta file containing V and J fragments:
+
+    
+        igmat build -a `<input_fasta>` -n 'bos' -v
+
+- Create a custom dataset `bos` with data from a pre-computed Stockholm alignment: 
+
+    
+        igmat build -a `<input_stockholm>` -n 'bos' -v
+
+Please note that the input fasta file with V and J fragments must be formatted in the following way:

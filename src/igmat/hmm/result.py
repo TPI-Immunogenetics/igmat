@@ -24,6 +24,14 @@ class Result():
   @property
   def type(self):
     return self._type
+  
+  @property
+  def evalue(self):
+    total_score = 0
+    for hit in self._hitList:
+      total_score += hit['evalue']
+      
+    return total_score
 
   def annotations(self):
     '''

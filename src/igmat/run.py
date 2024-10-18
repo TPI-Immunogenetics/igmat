@@ -128,6 +128,29 @@ class processWorker(multiprocessing.Process):
     self._stop = multiprocessing.Event()
     self.inputQueue = inputQueue
     self.outputQueue = outputQueue
+    
+  def process_nucleotide(self, sequence, model, threshold=0, restrict=[], hmmerpath=None):
+    
+    frame_list = fasta.translate(sequence)
+    
+    # Keep the result with the smaller evalue
+    result = None
+    for frame, sequence in frame_list.items():
+      try:
+        dataList = igmat.annotate(sequence, 
+          model=model,
+          restrict=restrict,
+          threshold=threshold)
+        for idx, value in enumerate(dataList):
+          if result is None or value.evalue < result.evalue:
+            result = dataList
+      except:
+        pass
+      
+    if result is None:
+      raise Exception('Unable to annotate sequence')
+    
+    return result
 
   def run(self):
 
@@ -150,12 +173,22 @@ class processWorker(multiprocessing.Process):
       try:
 
         # Process sequence
-        dataList = igmat.annotate(sequence, self.kwargs['dataset'],
-          restrict=self.kwargs['restrict'],
-          threshold=self.kwargs['bit_score_threshold'])
-        if dataList is None:
-          raise Exception('No annotation found!')
-
+        if sequence.getType() == 'protein':
+          dataList = igmat.annotate(sequence, 
+            self.kwargs['dataset'],
+            restrict=self.kwargs['restrict'],
+            threshold=self.kwargs['bit_score_threshold'])
+          if dataList is None:
+            raise Exception('No annotation found!')
+        elif sequence.getType() == 'nucleotide':
+          dataList = self.process_nucleotide(
+            sequence=sequence.getSequence(), 
+            model=self.kwargs['dataset'], 
+            restrict=self.kwargs['restrict'], 
+            threshold=self.kwargs['bit_score_threshold'])
+        else:
+          raise Exception('Invalid sequence type')
+        
         for idx, value in enumerate(dataList):
           sequence_name = sequence.getName() if len(dataList) == 1 else '{0}_{1}'.format(sequence.getName(),idx+1)
           self.outputQueue.put({
@@ -165,20 +198,11 @@ class processWorker(multiprocessing.Process):
             'name': sequence_name
           })
 
-        # # Append query details
-        # self.outputQueue.put({
-        #   'data': data,
-        #   'status': 'annotated',
-        #   'sequence': sequence.getSequence(),
-        #   'name': sequence.getName()
-        # })
-
         # All done
         self.kwargs['result'].increment('success')
 
       except Exception as e:
         logging.error('Error for sequence {name}: {error}'.format(name=sequence.getName(), error=str(e)))
-        # print(traceback.format_exc())
 
         # Append a result anyway
         self.outputQueue.put({
@@ -215,7 +239,7 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
   restrict = restrictList
 
   # # Get process start time
-  # start = time.time()
+  start_time = time.time()
 
   # Create the manager object
   manager = Manager(hmmerpath)
@@ -225,7 +249,6 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
 
   # Initialize the result counter
   result = counter.Counter(['total', 'success', 'failed'])
-  # result = None
 
   manager = multiprocessing.Manager()
   workQueue = manager.list()
@@ -291,12 +314,12 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
         break
 
       # Wait
-      time.sleep(0.5)
+      time.sleep(0.1)
 
     # Wait for the output worker to finish
     outputQueue.join()
-    outputProcess.stop();
-    outputProcess.join();
+    outputProcess.stop()
+    outputProcess.join()
 
   except ServiceExit:
       
@@ -305,12 +328,14 @@ def run(input, model, restrict=[], logPath=None, annotationPath=None, ncpu=1, bi
     for worker in processList:
       worker.stop()
 
-  # # Wait for all processes to finish
-  # print('Total: %d; Success: %d; Failed: %d' % (result.value('total'), result.value('success'), result.value('failed')))
+  # Record the end time
+  time_taken = time.time() - start_time
 
-  # # Print elapsed time
-  # hours, rem = divmod(time.time()-start, 3600)
-  # minutes, seconds = divmod(rem, 60)
-  # print('Total execution time: {:0>2}:{:0>2}:{:05.2f}'.format(int(hours), int(minutes), seconds))
+  # Convert to minutes and hours
+  seconds = time_taken
+  minutes = seconds / 60
+  hours = minutes / 60
+  print('Total execution time: {}:{}:{:.2f}'.format(int(hours), int(minutes), seconds))
+  print('Total: {}; Success: {}; Failed: {}'.format(result.value('total'), result.value('success'), result.value('failed')))
   
   # sys.exit(0)
