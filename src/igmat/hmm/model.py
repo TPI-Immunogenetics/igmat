@@ -213,7 +213,7 @@ class Model():
         consensus = self.__hmm_align__(domainMap[key]['list'], query.seq_len, sequence)
         if not consensus:
           return None
-
+        
         # Validate the alignment
         self.__hmm_validate__(consensus['state'], sequence)
 
@@ -240,7 +240,7 @@ class Model():
       'CDR2': {'start': 55, 'stop': 65},
       'FR3': {'start': 65, 'stop': 104},
       'CDR3': {'start': 104, 'stop': 117},
-      'FR4': {'start': 117, 'stop': 127}
+      'FR4': {'start': 117, 'stop': 128}
     }
 
     stateList = []
