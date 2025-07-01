@@ -3,6 +3,7 @@ import sys
 import json
 import math
 import tempfile
+from collections import defaultdict
 import shutil
 import traceback
 from subprocess import Popen, PIPE
@@ -13,7 +14,7 @@ from igmat.hmm.mapper import Mapper
 
 # Import the HMMER parser from the distributed version of Biopython.
 try: 
-  from Bio.SearchIO.HmmerIO import Hmmer3TextParser as HMMERParser
+  # from Bio.SearchIO.HmmerIO import Hmmer3TextParser as HMMERParser
   from Bio.SearchIO.HmmerIO import Hmmer3TextIndexer
 except ImportError as e:
   print('Unable to import Biopython. Please install Biopython module.')
@@ -125,78 +126,155 @@ class Model():
       process = Popen(command, stdout=PIPE, stderr=PIPE  )
       _, pr_stderr = process.communicate()
       if pr_stderr:
-          raise Exception(pr_stderr)
+        raise Exception(pr_stderr)
 
       # Parse the result
       parser = Hmmer3TextIndexer(output_filename)
       query = parser.get(0)
 
+      # --- START MODIFICATION ---
+
+      # 1. Group HSPs by hit_id and sum their evalues
+      grouped_hsps = defaultdict(list)
+      summed_evalues = defaultdict(float)
+
+      for hsp in query.hsps:
+          hit_id = hsp.hit_id
+          grouped_hsps[hit_id].append(hsp)
+          # summed_evalues[hit_id] += hsp.evalue
+          summed_evalues[hit_id] += hsp.bitscore # Summing bitscores
+
+      # 2. Sort the hit_ids (groups) by their summed evalues
+      # We create a list of tuples: (summed_evalue, hit_id) and sort it
+      # sorted_hit_ids = sorted(summed_evalues.items(), key=lambda item: item[1]) # item[1] is the summed evalue
+      sorted_hit_ids = sorted(summed_evalues.items(), key=lambda item: item[1], reverse=True) # Sort by bitscore, descending
+
       domainMap = {}
       domainMask = ['*'] * sequence.getSize()
 
-      # Iterate over the matches of the domains in order of their e-value (most significant first)
-      for hsp in sorted(query.hsps, key=lambda x: x.evalue):
+      # Iterate over the grouped hits in order of their summed e-value
+      for hit_id, summed_evalue  in sorted_hit_ids:
+          # Now iterate over the individual hsps within this group, sorted by their individual evalue
+          # This ensures that for a given hit_id, the best individual hits are considered first
+          for hsp in sorted(grouped_hsps[hit_id], key=lambda x: x.evalue):
 
-        # Skipping matches different to the top one
-        nameList = hsp.hit_id.split('_')
-        ctype = nameList.pop()
-        species = '_'.join(nameList)
+              nameList = hsp.hit_id.split('_')
+              ctype = nameList.pop()
+              species = '_'.join(nameList)
 
-        # Check if the hit is an extension of a seed
-        if hsp.hit_id in domainMap:
-          skip_hit = False
-          for hit_id in domainMap:
-            if hit_id == hsp.hit_id:
-              continue 
+              # Check if in the exclude list
+              if restrict and ctype not in restrict:
+                  # logging.info('skipping chain {chain}'.format(chain=ctype)) # Uncomment if you have logging configured
+                  continue
 
-            if (hsp.query_start > domainMap[hit_id]['start'] and hsp.query_start < domainMap[hit_id]['end']) or (hsp.query_end > domainMap[hit_id]['start'] and hsp.query_end < domainMap[hit_id]['end']):
-              skip_hit = True
-              break
+              # Check for overlaps with already accepted domains
+              skip_hit = False
+              # Create a temporary mask for the current hsp's region
+              temp_hit_mask = ['' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
+              overlaps = True if len(''.join(temp_hit_mask)) > 0 else False
 
-          if skip_hit:
-            continue
+              if overlaps:
+                  # print(f'Skipping {hsp.hit_id} due to overlap with existing accepted domain.')
+                  continue
+
+              # If we reached here, this hsp is a valid candidate to be added or extend an existing domain
+              if hsp.hit_id not in domainMap:
+                  # print(f'Adding {hsp.hit_id}') # Uncomment for debugging
+                  domainMap[hsp.hit_id] = {
+                      'type': ctype,
+                      'start': -1, # Initialize with -1 to ensure min/max logic works for first hit
+                      'end': -1,   # Initialize with -1 to ensure min/max logic works for first hit
+                      'evalue': None, # Will store the minimum evalue for this domain type
+                      'species': species,
+                      'hits': [], # List of individual hsp details
+                      'list': []  # List of raw hsp objects
+                  }
+
+              # Update the domainMask: Mark the region covered by this *accepted* hsp
+              domainMask = [ ('*' if domainMask[i] == '*' and (i < hsp.query_start or i >= hsp.query_end) else '-') for i in range(sequence.getSize()) ]
+
+              # Update aggregated information for this domain type
+              domainMap[hsp.hit_id]['start'] = min(hsp.query_start, domainMap[hsp.hit_id]['start']) if domainMap[hsp.hit_id]['start'] >= 0 else hsp.query_start
+              domainMap[hsp.hit_id]['end'] = max(hsp.query_end, domainMap[hsp.hit_id]['end']) if domainMap[hsp.hit_id]['end'] >= 0 else hsp.query_end
+              domainMap[hsp.hit_id]['evalue'] = min(hsp.evalue, domainMap[hsp.hit_id]['evalue']) if domainMap[hsp.hit_id]['evalue'] else hsp.evalue
+              domainMap[hsp.hit_id]['hits'].append({
+                  'id': hsp.hit_id,
+                  'description': hsp.hit_description,
+                  'evalue': hsp.evalue,
+                  'bitscore': hsp.bitscore,
+                  'bias': hsp.bias,
+                  'start': hsp.query_start,
+                  'end': hsp.query_end
+              })
+              domainMap[hsp.hit_id]['list'].append(hsp)
+
+      # --- END MODIFICATION ---
+      
+
+      # # Iterate over the matches of the domains in order of their e-value (most significant first)
+      # for hsp in sorted(query.hsps, key=lambda x: x.evalue):
+
+      #   # Skipping matches different to the top one
+      #   nameList = hsp.hit_id.split('_')
+      #   ctype = nameList.pop()
+      #   species = '_'.join(nameList)
+
+      #   # Check if the hit is an extension of a seed
+      #   if hsp.hit_id in domainMap:
+      #     skip_hit = False
+      #     for hit_id in domainMap:
+      #       if hit_id == hsp.hit_id:
+      #         continue 
+
+      #       if (hsp.query_start > domainMap[hit_id]['start'] and hsp.query_start < domainMap[hit_id]['end']) or (hsp.query_end > domainMap[hit_id]['start'] and hsp.query_end < domainMap[hit_id]['end']):
+      #         skip_hit = True
+      #         break
+
+      #     if skip_hit:
+      #       continue
 
 
+      #   # This check is done to avoid putting together different domains - for example two consecutive heavy and light chains
+      #   # However this seems to be a problem when I have a shorter (but stronger) initial match, then an extention of the same match down the list of hsp
+      #   hitMask = [ '' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
+      #   overlaps = True if len(''.join(hitMask)) > 0 else False
+      #   if overlaps:
+      #     continue
 
-        hitMask = [ '' if domainMask[i] == '*' else '*' for i in range(hsp.query_start, hsp.query_end)]
-        overlaps = True if len(''.join(hitMask)) > 0 else False
-        # if (hsp.hit_id not in domainMap) and overlaps:
-        if overlaps:
-          # print('Overlapping')
-          continue
+      #   if hsp.hit_id not in domainMap:
+      #     print(f'Adding {hsp.hit_id}')
+      #     domainMap[hsp.hit_id] = {
+      #       'type': ctype,
+      #       'start': -1,
+      #       'end': -1,
+      #       'evalue': None,
+      #       'species': species,
+      #       'hits': [],
+      #       'list': []
+      #     }
 
-        if hsp.hit_id not in domainMap:
-          domainMap[hsp.hit_id] = {
-            'type': ctype,
-            'start': -1,
-            'end': -1,
-            'evalue': None,
-            'species': species,
-            'hits': [],
-            'list': []
-          }
+      #   # Check if in the exclude list
+      #   if restrict and ctype not in restrict:
+      #     logging.info('skipping chain {chain}'.format(chain=ctype))
+      #     continue
 
-        # Check if in the exclude list
-        if restrict and ctype not in restrict:
-          logging.info('skipping chain {chain}'.format(chain=ctype))
-          continue
+      #   # This is a valid domain
+      #   domainMask = [ ('*' if domainMask[i] == '*' and (i < hsp.query_start or i >= hsp.query_end) else '-') for i in range(sequence.getSize()) ]
+      #   domainMap[hsp.hit_id]['start'] = min(hsp.query_start, domainMap[hsp.hit_id]['start']) if domainMap[hsp.hit_id]['start'] >= 0 else hsp.query_start
+      #   domainMap[hsp.hit_id]['end'] = max(hsp.query_end, domainMap[hsp.hit_id]['end']) if domainMap[hsp.hit_id]['end'] >= 0 else hsp.query_end
+      #   domainMap[hsp.hit_id]['evalue'] = min(hsp.evalue, domainMap[hsp.hit_id]['evalue']) if domainMap[hsp.hit_id]['evalue'] else hsp.evalue
+      #   domainMap[hsp.hit_id]['hits'].append({
+      #     'id': hsp.hit_id,
+      #     'description': hsp.hit_description,
+      #     'evalue': hsp.evalue,
+      #     'bitscore': hsp.bitscore,
+      #     'bias': hsp.bias,
+      #     'start': hsp.query_start,
+      #     'end': hsp.query_end
+      #   })
 
-        # This is a valid domain
-        domainMask = [ ('*' if domainMask[i] == '*' and (i < hsp.query_start or i >= hsp.query_end) else '-') for i in range(sequence.getSize()) ]
-        domainMap[hsp.hit_id]['start'] = min(hsp.query_start, domainMap[hsp.hit_id]['start']) if domainMap[hsp.hit_id]['start'] >= 0 else hsp.query_start
-        domainMap[hsp.hit_id]['end'] = max(hsp.query_end, domainMap[hsp.hit_id]['end']) if domainMap[hsp.hit_id]['end'] >= 0 else hsp.query_end
-        domainMap[hsp.hit_id]['evalue'] = min(hsp.evalue, domainMap[hsp.hit_id]['evalue']) if domainMap[hsp.hit_id]['evalue'] else hsp.evalue
-        domainMap[hsp.hit_id]['hits'].append({
-          'id': hsp.hit_id,
-          'description': hsp.hit_description,
-          'evalue': hsp.evalue,
-          'bitscore': hsp.bitscore,
-          'bias': hsp.bias,
-          'start': hsp.query_start,
-          'end': hsp.query_end
-        })
+      #   domainMap[hsp.hit_id]['list'].append(hsp)
 
-        domainMap[hsp.hit_id]['list'].append(hsp)
 
       # No valid match found
       if not domainMap:
@@ -204,7 +282,6 @@ class Model():
 
       resultList = []
       for key in domainMap:
-
         # Check the match seed evalue
         if domainMap[key]['evalue'] > 1e-10:
           continue

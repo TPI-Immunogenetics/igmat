@@ -24,5 +24,18 @@
                 "RedirectOutput"
             ]
         },
+        {
+            "name": "igmat_ultralong",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/env/bin/igmat",
+            "args": [
+                "run",
+                "-v",
+                "-i", "QVQLRESGPSLVKPSQTLSLTCTVSGISLSDKAVGWVRQAPGKALEWLGSIDAGGSTGYNPGLKSRLSITTDNSKSQVSLSMSGVTTEDSATYYCTTVHQKTLKQKTCPEGYSDDDGCDDSYGCGDDCCCYGGYSDYGGYEYACCSRTYTYEFHVDAWGQGLLVTVS"
+            ],
+            "cwd": "${workspaceRoot}"
+        },
     ]
 }
